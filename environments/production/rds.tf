@@ -1,48 +1,57 @@
-# -----------------------------------------------------------------------------
-# RDS DATABASE
-# -----------------------------------------------------------------------------
+# RDS Database Instance
+# PostgreSQL database for application data
 
 module "rds" {
   source = "../../modules/rds"
 
-  identifier     = "${var.environment}-postgres"
+  identifier     = "${var.environment}-postgres-db"
   engine         = "postgres"
   engine_version = "15.4"
-  instance_class = "db.t3.medium"
+  instance_class = "db.t3.micro"
 
-  allocated_storage     = 100
-  max_allocated_storage = 500
-  storage_type          = "gp3"
+  allocated_storage     = 20
+  max_allocated_storage = 100
   storage_encrypted     = true
 
   db_name  = "appdb"
-  username = data.aws_ssm_parameter.db_username.value
-  password = data.aws_ssm_parameter.db_password.value
-  port     = 5432
+  username = "dbadmin"
+  password = random_password.db_password.result
 
-  vpc_id             = module.networking.vpc_id
-  subnet_ids         = module.networking.private_data_subnet_ids
-  security_group_ids = [module.security_groups["rds"].security_group_id]
+  # Network configuration
+  vpc_security_group_ids     = [module.security_groups["rds"].security_group_id]
+  db_subnet_group_subnet_ids = module.networking.private_data_subnet_ids
 
-  multi_az            = true
-  publicly_accessible = false
-
+  # Backup configuration
   backup_retention_period = 7
   backup_window           = "03:00-04:00"
   maintenance_window      = "sun:04:00-sun:05:00"
 
-  deletion_protection = var.environment == "production" ? true : false
-  skip_final_snapshot = var.environment != "production"
+  # High availability
+  multi_az            = false
+  publicly_accessible = false
 
+  # Deletion protection
+  deletion_protection = true
+
+  # Final snapshot
+  skip_final_snapshot       = false
+  final_snapshot_identifier = "${var.environment}-postgres-final-snapshot"
+
+  # CloudWatch logs
   enabled_cloudwatch_logs_exports = ["postgresql", "upgrade"]
 
+  # Performance Insights
   performance_insights_enabled          = true
   performance_insights_retention_period = 7
-  performance_insights_kms_key_id       = var.kms_key_id
 
+  # IAM authentication
   iam_database_authentication_enabled = true
 
   tags = {
     Environment = var.environment
+    Service     = "database"
+    ManagedBy   = "terraform"
   }
 }
+
+# REMOVED: random_password and module "parameter_store" - already in parameter_store.tf

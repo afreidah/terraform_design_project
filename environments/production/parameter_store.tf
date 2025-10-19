@@ -1,44 +1,48 @@
-# -----------------------------------------------------------------------------
-# PARAMETER STORE (Secrets Management)
-# -----------------------------------------------------------------------------
+# SSM Parameter Store
+# Secure storage for application secrets and configuration
+
+# Random password for RDS
+resource "random_password" "db_password" {
+  length  = 32
+  special = true
+}
 
 module "parameter_store" {
   source = "../../modules/parameter-store"
 
   parameters = {
-    "/${var.environment}/database/master_username" = {
-      description = "RDS master username"
-      type        = "SecureString"
-      value       = "dbadmin"
-    }
-    "/${var.environment}/database/master_password" = {
+    # Database credentials
+    "/${var.environment}/rds/password" = {
+      value       = random_password.db_password.result
       description = "RDS master password"
       type        = "SecureString"
-      value       = "ChangeMe123!"
     }
-    "/${var.environment}/redis/auth_token" = {
-      description = "Redis AUTH token"
-      type        = "SecureString"
-      value       = "MyRedisAuthToken1234567890!" # Must be 16-128 alphanumeric
+    "/${var.environment}/rds/endpoint" = {
+      value       = module.rds.endpoint
+      description = "RDS endpoint"
+      type        = "String"
     }
-    "/${var.environment}/opensearch/master_password" = {
-      description = "OpenSearch master password"
-      type        = "SecureString"
-      value       = "OpenSearch123!" # Must meet complexity requirements
+    "/${var.environment}/rds/username" = {
+      value       = module.rds.username
+      description = "RDS master username"
+      type        = "String"
     }
-    "/${var.environment}/app/api_key" = {
-      description = "Application API key"
-      type        = "SecureString"
-      value       = "your-api-key-here"
+
+    # Application configuration
+    "/${var.environment}/app/env" = {
+      value       = var.environment
+      description = "Application environment"
+      type        = "String"
     }
-    "/${var.environment}/app/encryption_key" = {
-      description = "Application encryption key"
-      type        = "SecureString"
-      value       = "your-encryption-key-here"
+    "/${var.environment}/app/region" = {
+      value       = var.region
+      description = "AWS region"
+      type        = "String"
     }
   }
 
   tags = {
     Environment = var.environment
+    ManagedBy   = "terraform"
   }
 }

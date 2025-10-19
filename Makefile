@@ -41,6 +41,17 @@ check-env:
 	fi
 	@echo "$(GREEN)✓ Using environment: $(ENV)$(NC)"
 
+##@ initializing terraform
+init: check-env ## Initialize Terraform for environment
+	@echo "$(BLUE)Initializing Terraform for $(ENV)...$(NC)"
+	cd $(TERRAFORM_DIR) && terraform init
+	@echo "$(GREEN)✓ Terraform initialized$(NC)"
+
+init-upgrade: check-env ## Initialize and upgrade providers to latest versions
+	@echo "$(BLUE)Initializing Terraform and upgrading providers for $(ENV)...$(NC)"
+	cd $(TERRAFORM_DIR) && terraform init -upgrade
+	@echo "$(GREEN)✓ Terraform initialized with upgraded providers$(NC)"
+
 ##@ Code Quality
 
 fmt: ## Format all Terraform files
