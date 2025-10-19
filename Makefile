@@ -117,10 +117,10 @@ test: ## Run terraform test on all modules
 
 ##@ Planning
 
-plan: check-env ## Create Terraform execution plan
-	@echo "$(BLUE)Creating plan for $(ENV)...$(NC)"
-	cd $(TERRAFORM_DIR) && terraform init
-	cd $(TERRAFORM_DIR) && terraform plan -parallelism=20 -out=$(PLAN_FILE)
+plan: init ## Create execution plan
+	@echo "$(BLUE)Planning changes for $(ENV)...$(NC)"
+	@terraform -chdir=$(TERRAFORM_DIR) plan -out=tfplan
+	@terraform -chdir=$(TERRAFORM_DIR) show -json tfplan > tfplan.json
 	@echo "$(GREEN)✓ Plan created$(NC)"
 
 plan-target: check-env ## Plan specific target (usage: make plan-target TARGET=module.vpc)
@@ -158,16 +158,24 @@ output-json: check-env ## Show outputs in JSON format
 	cd $(TERRAFORM_DIR) && terraform output -json
 
 ##@ Cost Estimation
-
-cost: plan ## Estimate infrastructure costs with openinfraquote
+cost: ## Estimate infrastructure costs with Infracost (requires existing plan)
 	@echo "$(BLUE)Estimating costs for $(ENV)...$(NC)"
-	@if command -v oiq >/dev/null 2>&1; then \
-		cd $(TERRAFORM_DIR) && oiq estimate --plan $(PLAN_FILE); \
-	else \
-		echo "$(RED)Error: openinfraquote (oiq) not installed$(NC)"; \
-		echo "Install from: https://github.com/kaytu-io/infracost"; \
+	@if [ ! -f "$(TERRAFORM_DIR)/tfplan" ]; then \
+		echo "$(RED)No plan file found. Run 'make plan' first.$(NC)"; \
 		exit 1; \
 	fi
+	@if ! command -v infracost >/dev/null 2>&1; then \
+		echo "$(RED)Infracost not installed$(NC)"; \
+		echo "Install: curl -fsSL https://raw.githubusercontent.com/infracost/infracost/master/scripts/install.sh | sh"; \
+		exit 1; \
+	fi
+	@if [ -z "$$INFRACOST_API_KEY" ]; then \
+		echo "$(RED)INFRACOST_API_KEY not set$(NC)"; \
+		exit 1; \
+	fi
+	@infracost breakdown --path $(TERRAFORM_DIR) --format table
+
+.PHONY: cost
 
 ##@ Documentation
 
@@ -202,6 +210,7 @@ clean-all: ## Clean all environments and modules
 	find environments -name "$(PLAN_FILE)" -delete
 	find environments -name "*.tfstate.backup" -delete
 	find . -type d -name ".terraform" -exec rm -rf {} + 2>/dev/null || true
+	rm tfplan.json
 	find modules -name ".terraform.lock.hcl" -delete
 	@echo "$(GREEN)✓ All environments and modules cleaned$(NC)"
 
@@ -303,7 +312,7 @@ deploy: all apply ## Full deployment workflow
 
 ##@ CI/CD Pipeline
 
-pull_request: fmt-check lint test security plan ## Full PR validation workflow
+pull_request: fmt-check lint test security plan
 	@echo "$(GREEN)✓✓✓ Pull request checks passed - ready for review$(NC)"
 
 merge: check-env ## Apply changes after merge (production only)

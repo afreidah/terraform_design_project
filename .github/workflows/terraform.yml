@@ -63,6 +63,11 @@ jobs:
       - name: Load image
         run: docker load --input /tmp/${{ env.DOCKER_IMAGE }}.tar
 
+      - name: Setup Infracost
+        uses: infracost/actions/setup@v3
+        with:
+          api-key: ${{ secrets.INFRACOST_API_KEY }}
+
       - name: Run validation
         id: validate
         run: |
@@ -71,6 +76,7 @@ jobs:
             -e AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }} \
             -e AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }} \
             -e AWS_REGION=${{ env.AWS_REGION }} \
+            -e INFRACOST_API_KEY=${{ secrets.INFRACOST_API_KEY }} \
             ${{ env.DOCKER_IMAGE }}:${{ github.sha }} \
             make pull_request ENV=${{ matrix.environment }}
         continue-on-error: true
@@ -80,6 +86,20 @@ jobs:
         run: |
           cd environments/${{ matrix.environment }}
           [ -f tfplan ] && terraform show -no-color tfplan > tfplan.txt || echo "No plan generated" > tfplan.txt
+
+      - name: Generate Infracost JSON
+        if: always()
+        run: |
+          infracost breakdown --path environments/${{ matrix.environment }} \
+            --format json \
+            --out-file /tmp/infracost-${{ matrix.environment }}.json
+
+      - name: Post Infracost comment
+        if: always()
+        uses: infracost/actions/comment@v3
+        with:
+          path: /tmp/infracost-${{ matrix.environment }}.json
+          behavior: update
 
       - uses: actions/upload-artifact@v4
         if: always()

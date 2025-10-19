@@ -34,5 +34,12 @@ skip-check:
   # OpenSearch
   - CKV2_AWS_52   # OpenSearch fine-grained access control (already enabled)
 
+  # EKS configurations
+  - CKV_AWS_38    # EKS public endpoint 0.0.0.0/0 (needed for kubectl access, TODO: restrict)
+  - CKV_AWS_39    # EKS public endpoint disabled (needed for kubectl access)
+  - CKV_AWS_338   # CloudWatch retention 1 year (90 days is sufficient for EKS control plane logs)
+  - CKV_AWS_382   # Node egress 0.0.0.0/0 (needed to pull container images and updates)
+  - CKV_AWS_341   # Metadata hop limit > 1 (required for EKS pods to access IMDS)
+
 compact: true
 quiet: false

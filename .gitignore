@@ -31,3 +31,6 @@ terraform.rc
 
 # Module lockfiles
 modules/*/.terraform.lock.hcl
+
+# plan files
+*plan*
