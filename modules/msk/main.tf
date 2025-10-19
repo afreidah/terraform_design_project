@@ -3,7 +3,8 @@ resource "aws_cloudwatch_log_group" "this" {
   count = var.cloudwatch_logs_enabled ? 1 : 0
 
   name              = "/aws/msk/${var.cluster_name}"
-  retention_in_days = 7
+  retention_in_days = var.cloudwatch_retention_days # CHANGED
+  kms_key_id        = var.cloudwatch_kms_key_id     # ADDED
 
   tags = var.tags
 }

@@ -1,6 +1,13 @@
 # environments/production/locals.tf
 
 locals {
+  # Common tags for all resources
+  common_tags = {
+    Environment = var.environment
+    Project     = "infrastructure-exercise"
+    ManagedBy   = "Terraform"
+  }
+
   security_groups = {
     alb_public = {
       description = "Security group for public-facing ALB"

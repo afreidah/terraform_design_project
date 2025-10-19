@@ -13,20 +13,20 @@ resource "aws_opensearch_domain" "this" {
 
     zone_awareness_enabled = var.zone_awareness_enabled
 
-    zone_awareness_config {
-      availability_zone_count = var.availability_zone_count
+    dynamic "zone_awareness_config" {
+      for_each = var.zone_awareness_enabled ? [1] : []
+      content {
+        availability_zone_count = var.availability_zone_count
+      }
     }
   }
 
   ebs_options {
     ebs_enabled = var.ebs_enabled
-    volume_type = var.ebs_volume_type
-    volume_size = var.ebs_volume_size
-  }
-
-  vpc_options {
-    subnet_ids         = var.subnet_ids
-    security_group_ids = var.security_group_ids
+    volume_type = var.volume_type
+    volume_size = var.volume_size
+    iops        = var.volume_type == "gp3" ? var.iops : null
+    throughput  = var.volume_type == "gp3" ? var.throughput : null
   }
 
   encrypt_at_rest {
@@ -39,71 +39,108 @@ resource "aws_opensearch_domain" "this" {
   }
 
   domain_endpoint_options {
-    enforce_https       = var.enforce_https
-    tls_security_policy = var.tls_security_policy
+    enforce_https       = var.domain_endpoint_options.enforce_https
+    tls_security_policy = var.domain_endpoint_options.tls_security_policy
   }
 
-  advanced_security_options {
-    enabled                        = var.advanced_security_options_enabled
-    internal_user_database_enabled = var.internal_user_database_enabled
+  # Only add advanced_security_options if enabled
+  dynamic "advanced_security_options" {
+    for_each = var.advanced_security_options.enabled ? [1] : []
+    content {
+      enabled                        = true
+      internal_user_database_enabled = var.advanced_security_options.internal_user_database_enabled
 
-    master_user_options {
-      master_user_name     = var.master_user_name
-      master_user_password = var.master_user_password
+      master_user_options {
+        master_user_name     = var.advanced_security_options.master_user_name
+        master_user_password = var.advanced_security_options.master_user_password
+      }
     }
+  }
+
+  vpc_options {
+    subnet_ids         = var.subnet_ids
+    security_group_ids = var.security_group_ids
   }
 
   snapshot_options {
     automated_snapshot_start_hour = var.automated_snapshot_start_hour
   }
 
+  # Index slow logs
   log_publishing_options {
     cloudwatch_log_group_arn = aws_cloudwatch_log_group.index_slow_logs.arn
     log_type                 = "INDEX_SLOW_LOGS"
+    enabled                  = true
   }
 
+  # Search slow logs
   log_publishing_options {
     cloudwatch_log_group_arn = aws_cloudwatch_log_group.search_slow_logs.arn
     log_type                 = "SEARCH_SLOW_LOGS"
+    enabled                  = true
   }
 
+  # Application logs
   log_publishing_options {
     cloudwatch_log_group_arn = aws_cloudwatch_log_group.es_application_logs.arn
     log_type                 = "ES_APPLICATION_LOGS"
+    enabled                  = true
   }
 
-  tags = merge(
-    var.tags,
-    {
-      Name = var.domain_name
+  # Audit logs
+  dynamic "log_publishing_options" {
+    for_each = var.enable_audit_logs ? [1] : []
+    content {
+      cloudwatch_log_group_arn = aws_cloudwatch_log_group.audit_logs[0].arn
+      log_type                 = "AUDIT_LOGS"
+      enabled                  = true
     }
-  )
-
-  lifecycle {
-    ignore_changes = [
-      advanced_security_options[0].master_user_options[0].master_user_password
-    ]
   }
+
+  tags = var.tags
+
+  depends_on = [
+    aws_cloudwatch_log_group.index_slow_logs,
+    aws_cloudwatch_log_group.search_slow_logs,
+    aws_cloudwatch_log_group.es_application_logs,
+    aws_cloudwatch_log_resource_policy.this
+  ]
 }
 
-# CloudWatch Log Groups
+# CloudWatch Log Group - Index Slow Logs
 resource "aws_cloudwatch_log_group" "index_slow_logs" {
   name              = "/aws/opensearch/${var.domain_name}/index-slow-logs"
-  retention_in_days = 7
+  retention_in_days = var.cloudwatch_retention_days
+  kms_key_id        = var.cloudwatch_kms_key_id
 
   tags = var.tags
 }
 
+# CloudWatch Log Group - Search Slow Logs
 resource "aws_cloudwatch_log_group" "search_slow_logs" {
   name              = "/aws/opensearch/${var.domain_name}/search-slow-logs"
-  retention_in_days = 7
+  retention_in_days = var.cloudwatch_retention_days
+  kms_key_id        = var.cloudwatch_kms_key_id
 
   tags = var.tags
 }
 
+# CloudWatch Log Group - Application Logs
 resource "aws_cloudwatch_log_group" "es_application_logs" {
   name              = "/aws/opensearch/${var.domain_name}/application-logs"
-  retention_in_days = 7
+  retention_in_days = var.cloudwatch_retention_days
+  kms_key_id        = var.cloudwatch_kms_key_id
+
+  tags = var.tags
+}
+
+# CloudWatch Log Group - Audit Logs
+resource "aws_cloudwatch_log_group" "audit_logs" {
+  count = var.enable_audit_logs ? 1 : 0
+
+  name              = "/aws/opensearch/${var.domain_name}/audit-logs"
+  retention_in_days = var.cloudwatch_retention_days
+  kms_key_id        = var.cloudwatch_kms_key_id
 
   tags = var.tags
 }

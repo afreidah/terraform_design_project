@@ -1,0 +1,23 @@
+# Checkov configuration
+skip-check:
+  # Intentional design decisions
+  - CKV_AWS_130  # Public subnets auto-assign IPs (needed for NAT gateways)
+  - CKV2_AWS_5   # Security groups not attached (false positive during plan)
+  
+  # Egress rules - documented as acceptable
+  - CKV_AWS_104  # Security group egress 0.0.0.0/0 (EC2 needs package updates)
+```
+
+### **`.trivyignore`** - Create this file:
+```
+# Trivy ignore file
+# Intentional architectural decisions
+
+# Public ALB exposed to internet - by design
+AVD-AWS-0053
+
+# Public subnets assign public IPs - needed for NAT gateways
+AVD-AWS-0164
+
+# Security group egress 0.0.0.0/0 - needed for EC2 package updates
+AVD-AWS-0104

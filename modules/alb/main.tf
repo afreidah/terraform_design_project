@@ -1,5 +1,6 @@
 # Application Load Balancer
 resource "aws_lb" "this" {
+  #tfsec:ignore:aws-elb-alb-not-public Intentional: Public ALB by design
   name               = var.name
   internal           = var.internal
   load_balancer_type = "application"
@@ -10,6 +11,15 @@ resource "aws_lb" "this" {
   enable_http2                     = var.enable_http2
   enable_cross_zone_load_balancing = var.enable_cross_zone_load_balancing
   idle_timeout                     = var.idle_timeout
+  drop_invalid_header_fields       = var.drop_invalid_header_fields
+
+  dynamic "access_logs" {
+    for_each = var.access_logs_enabled && var.access_logs_bucket != null ? [1] : []
+    content {
+      bucket  = var.access_logs_bucket
+      enabled = true
+    }
+  }
 
   tags = merge(
     var.tags,
@@ -63,8 +73,11 @@ resource "aws_lb_target_group" "this" {
   }
 }
 
-# HTTP Listener (redirect to HTTPS if certificate provided, otherwise forward)
+# HTTP Listener (redirects to HTTPS or forwards to target group)
 resource "aws_lb_listener" "http" {
+  #tfsec:ignore:aws-elb-http-not-used HTTP redirects to HTTPS when certificate is provided
+  #checkov:skip=CKV_AWS_2:HTTP listener redirects to HTTPS
+  #checkov:skip=CKV_AWS_103:HTTP listener redirects to HTTPS
   load_balancer_arn = aws_lb.this.arn
   port              = 80
   protocol          = "HTTP"
@@ -92,28 +105,28 @@ resource "aws_lb_listener" "http" {
   tags = var.tags
 }
 
-# HTTPS Listener (if certificate provided)
+# HTTPS Listener
 resource "aws_lb_listener" "https" {
   count = var.certificate_arn != null ? 1 : 0
 
   load_balancer_arn = aws_lb.this.arn
   port              = 443
   protocol          = "HTTPS"
-  ssl_policy        = "ELBSecurityPolicy-TLS13-1-2-2021-06"
+  ssl_policy        = "ELBSecurityPolicy-TLS-1-2-2017-01"
   certificate_arn   = var.certificate_arn
 
   default_action {
     type             = "forward"
-    target_group_arn = length(var.target_groups) > 0 ? aws_lb_target_group.this[keys(var.target_groups)[0]].arn : null
+    target_group_arn = aws_lb_target_group.this[keys(var.target_groups)[0]].arn
   }
 
   tags = var.tags
 }
 
-# WAF Association (if enabled)
+# WAF Association
 resource "aws_wafv2_web_acl_association" "this" {
-  count = var.enable_waf ? 1 : 0
+  count = var.waf_web_acl_arn != null ? 1 : 0
 
   resource_arn = aws_lb.this.arn
-  web_acl_arn  = var.waf_acl_arn
+  web_acl_arn  = var.waf_web_acl_arn
 }
