@@ -89,6 +89,8 @@ jobs:
 
       - name: Generate Infracost JSON
         if: always()
+        env:
+          INFRACOST_API_KEY: ${{ secrets.INFRACOST_API_KEY }}
         run: |
           infracost breakdown --path environments/${{ matrix.environment }} \
             --format json \
@@ -96,6 +98,8 @@ jobs:
 
       - name: Post Infracost comment
         if: always()
+        env:
+          INFRACOST_API_KEY: ${{ secrets.INFRACOST_API_KEY }}
         uses: infracost/actions/comment@v1
         with:
           path: /tmp/infracost-${{ matrix.environment }}.json
