@@ -26,7 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v2
       - uses: docker/build-push-action@v5
         with:
           context: .
@@ -64,7 +64,7 @@ jobs:
         run: docker load --input /tmp/${{ env.DOCKER_IMAGE }}.tar
 
       - name: Setup Infracost
-        uses: infracost/actions/setup@v3
+        uses: infracost/actions/setup@v2
         with:
           api-key: ${{ secrets.INFRACOST_API_KEY }}
 
@@ -96,7 +96,7 @@ jobs:
 
       - name: Post Infracost comment
         if: always()
-        uses: infracost/actions/comment@v3
+        uses: infracost/actions/comment@v2
         with:
           path: /tmp/infracost-${{ matrix.environment }}.json
           behavior: update
