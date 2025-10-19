@@ -48,20 +48,32 @@ variable "idle_timeout" {
   default     = 60
 }
 
-variable "enable_waf" {
-  description = "Enable WAF on the ALB"
+variable "drop_invalid_header_fields" {
+  description = "Drop invalid HTTP header fields"
+  type        = bool
+  default     = true
+}
+
+variable "access_logs_enabled" {
+  description = "Enable ALB access logging"
   type        = bool
   default     = false
 }
 
-variable "waf_acl_arn" {
-  description = "ARN of the WAF WebACL to associate with the ALB"
+variable "access_logs_bucket" {
+  description = "S3 bucket for ALB access logs"
   type        = string
   default     = null
 }
 
 variable "certificate_arn" {
   description = "ARN of SSL certificate for HTTPS listener"
+  type        = string
+  default     = null
+}
+
+variable "waf_web_acl_arn" {
+  description = "ARN of the WAF WebACL to associate with the ALB"
   type        = string
   default     = null
 }
