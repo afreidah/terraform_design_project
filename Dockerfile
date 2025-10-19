@@ -5,7 +5,7 @@
 # -----------------------------------------------------------------------------
 # Stage 1: Builder - Download and install all tools
 # -----------------------------------------------------------------------------
-FROM ubuntu:22.04 AS builder
+FROM debian:bookworm-slim AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TERRAFORM_VERSION=1.13.4
