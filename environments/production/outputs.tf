@@ -69,12 +69,27 @@ output "parameter_names" {
 # RDS Outputs
 output "rds_endpoint" {
   description = "RDS instance endpoint"
-  value       = module.rds.db_instance_endpoint
+  value       = module.rds.endpoint
 }
 
 output "rds_address" {
   description = "RDS instance address"
-  value       = module.rds.db_instance_address
+  value       = module.rds.address
+}
+
+output "rds_port" {
+  description = "RDS instance port"
+  value       = module.rds.port
+}
+
+output "rds_id" {
+  description = "RDS instance ID"
+  value       = module.rds.id
+}
+
+output "rds_arn" {
+  description = "RDS instance ARN"
+  value       = module.rds.arn
 }
 
 # Elasticache Outputs
