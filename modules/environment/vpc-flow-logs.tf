@@ -77,3 +77,14 @@ resource "aws_flow_log" "main" {
     }
   )
 }
+
+# Outputs
+output "vpc_flow_log_id" {
+  description = "ID of the VPC Flow Log"
+  value       = aws_flow_log.main.id
+}
+
+output "vpc_flow_log_group_name" {
+  description = "CloudWatch Log Group name for VPC Flow Logs"
+  value       = aws_cloudwatch_log_group.vpc_flow_logs.name
+}
