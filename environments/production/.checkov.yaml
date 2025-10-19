@@ -1,8 +1,0 @@
-# Checkov configuration
-skip-check:
-  # Intentional design decisions
-  - CKV_AWS_130  # Public subnets auto-assign IPs (needed for NAT gateways)
-  - CKV2_AWS_5   # Security groups not attached (false positive during plan)
-  
-  # Egress rules - documented as acceptable
-  - CKV_AWS_104  # Security group egress 0.0.0.0/0 (EC2 needs package updates)

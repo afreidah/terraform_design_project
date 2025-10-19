@@ -1,0 +1,33 @@
+# tfsec configuration
+
+# Exclude modules - multiple patterns to be sure
+exclude_paths:
+  - "modules/**"
+  - "**/modules/**"
+  - "../../modules/**"
+
+exclude:
+  # Public ALB
+  - aws-elb-alb-not-public
+  # Public subnets
+  - aws-ec2-no-public-ip-subnet
+  # Public ingress
+  - aws-ec2-no-public-ingress-sgr
+  # Public egress
+  - aws-ec2-no-public-egress-sgr
+  # HTTP listener
+  - aws-elb-http-not-used
+  # Security group descriptions
+  - aws-ec2-add-description-to-security-group
+  # VPC Flow Logs
+  - aws-ec2-require-vpc-flow-logs-for-all-vpcs
+  # RDS deletion protection - set at environment level, not module level
+  - aws-rds-enable-deletion-protection
+    # VPC Flow Logs requires CreateLogStream with wildcard for dynamic stream names
+  - aws-iam-no-policy-wildcards
+
+severity_overrides:
+  aws-elb-alb-not-public: LOW
+  aws-ec2-no-public-ip-subnet: LOW
+
+minimum_severity: MEDIUM

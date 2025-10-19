@@ -10,6 +10,7 @@ variable "environment" {
   type        = string
 }
 
+# VPC Configuration
 variable "vpc_cidr" {
   description = "VPC CIDR block"
   type        = string
@@ -35,6 +36,7 @@ variable "private_data_subnet_cidrs" {
   type        = list(string)
 }
 
+# EC2 Configuration
 variable "ec2_ami_id" {
   description = "AMI ID for EC2 instances"
   type        = string
@@ -46,8 +48,9 @@ variable "ec2_instance_type" {
   default     = "t3.medium"
 }
 
+# Optional: KMS Key for encryption
 variable "kms_key_id" {
-  description = "KMS key ID for encryption"
+  description = "KMS key ID for encryption (RDS, Performance Insights, etc.)"
   type        = string
   default     = null
 }

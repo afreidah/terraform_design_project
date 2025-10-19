@@ -1,0 +1,26 @@
+# Trivy ignore file - Intentional design decisions
+
+# Public ALB exposed to internet - by design
+AVD-AWS-0053
+
+# Public subnets assign public IPs - needed for NAT gateways
+AVD-AWS-0164
+
+# Security group egress 0.0.0.0/0 - needed for package updates
+AVD-AWS-0104
+
+# HTTP listener redirects to HTTPS when certificate provided
+AVD-AWS-0054
+
+# VPC Flow Logs - added separately in vpc-flow-logs.tf
+AVD-AWS-0178
+
+# RDS deletion protection - configured per environment
+AVD-AWS-0177
+
+# Security group descriptions provided via variable
+AVD-AWS-0099
+
+# VPC Flow Logs requires wildcard to create dynamic log streams
+# The wildcard is scoped to a specific log group, not all CloudWatch Logs
+AVD-AWS-0057

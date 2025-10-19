@@ -1,10 +1,10 @@
 variable "identifier" {
-  description = "Identifier for the RDS instance"
+  description = "Unique identifier for the RDS instance"
   type        = string
 }
 
 variable "engine" {
-  description = "Database engine (postgres, mysql, etc.)"
+  description = "Database engine (e.g., postgres, mysql)"
   type        = string
   default     = "postgres"
 }
@@ -12,29 +12,27 @@ variable "engine" {
 variable "engine_version" {
   description = "Database engine version"
   type        = string
-  default     = "15.4"
 }
 
 variable "instance_class" {
-  description = "Instance class for RDS"
+  description = "Instance type for the RDS instance"
   type        = string
-  default     = "db.t3.medium"
 }
 
 variable "allocated_storage" {
   description = "Allocated storage in GB"
   type        = number
-  default     = 100
+  default     = 20
 }
 
 variable "max_allocated_storage" {
-  description = "Maximum allocated storage for autoscaling in GB"
+  description = "Maximum storage for autoscaling in GB"
   type        = number
-  default     = 500
+  default     = 100
 }
 
 variable "storage_type" {
-  description = "Storage type (gp3, gp2, io1)"
+  description = "Storage type (gp2, gp3, io1)"
   type        = string
   default     = "gp3"
 }
@@ -46,7 +44,7 @@ variable "storage_encrypted" {
 }
 
 variable "kms_key_id" {
-  description = "KMS key ID for encryption"
+  description = "KMS key ID for storage encryption"
   type        = string
   default     = null
 }
@@ -73,31 +71,26 @@ variable "port" {
   default     = 5432
 }
 
-variable "vpc_id" {
-  description = "VPC ID"
+variable "vpc_security_group_ids" {
+  description = "List of VPC security group IDs to associate with the RDS instance"
+  type        = list(string)
+}
+
+variable "db_subnet_group_subnet_ids" {
+  description = "List of subnet IDs for the DB subnet group"
+  type        = list(string)
+}
+
+variable "parameter_group_name" {
+  description = "Name of the DB parameter group to associate"
   type        = string
+  default     = null
 }
 
-variable "subnet_ids" {
-  description = "List of subnet IDs for DB subnet group"
-  type        = list(string)
-}
-
-variable "security_group_ids" {
-  description = "List of security group IDs"
-  type        = list(string)
-}
-
-variable "multi_az" {
-  description = "Enable Multi-AZ deployment"
-  type        = bool
-  default     = true
-}
-
-variable "publicly_accessible" {
-  description = "Make database publicly accessible"
-  type        = bool
-  default     = false
+variable "option_group_name" {
+  description = "Name of the DB option group to associate"
+  type        = string
+  default     = null
 }
 
 variable "backup_retention_period" {
@@ -118,10 +111,16 @@ variable "maintenance_window" {
   default     = "sun:04:00-sun:05:00"
 }
 
-variable "deletion_protection" {
-  description = "Enable deletion protection"
+variable "multi_az" {
+  description = "Enable Multi-AZ deployment"
   type        = bool
-  default     = true
+  default     = false
+}
+
+variable "publicly_accessible" {
+  description = "Make instance publicly accessible"
+  type        = bool
+  default     = false
 }
 
 variable "skip_final_snapshot" {
@@ -164,6 +163,30 @@ variable "iam_database_authentication_enabled" {
   description = "Enable IAM database authentication"
   type        = bool
   default     = true
+}
+
+variable "auto_minor_version_upgrade" {
+  description = "Automatically upgrade minor engine versions"
+  type        = bool
+  default     = false
+}
+
+variable "monitoring_interval" {
+  description = "Enhanced monitoring interval in seconds (0, 1, 5, 10, 15, 30, 60)"
+  type        = number
+  default     = 0
+}
+
+variable "monitoring_role_arn" {
+  description = "IAM role ARN for enhanced monitoring"
+  type        = string
+  default     = null
+}
+
+variable "deletion_protection" {
+  description = "Enable deletion protection for RDS instance"
+  type        = bool
+  default     = true # Secure by default!
 }
 
 variable "tags" {

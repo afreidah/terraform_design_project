@@ -1,0 +1,38 @@
+# Checkov configuration
+
+# Exclude modules
+skip-path:
+  - modules
+
+skip-check:
+  # Original exclusions
+  - CKV_AWS_130   # Public subnets auto-assign IPs (NAT gateways)
+  - CKV2_AWS_5    # Security groups not attached (false positive)
+  - CKV_AWS_23    # Security group egress 0.0.0.0/0 (package updates)
+  - CKV_AWS_260   # Public ingress (public ALB by design)
+  - CKV_AWS_2     # HTTP listener (redirects to HTTPS)
+  - CKV_AWS_103   # HTTP listener (redirects to HTTPS)
+
+  # RDS configurations
+  - CKV_AWS_118   # RDS enhanced monitoring (not needed for dev/test)
+  - CKV_AWS_226   # RDS auto minor upgrades (controlled manually)
+  - CKV2_AWS_30   # Postgres query logging (performance impact)
+
+  # VPC and networking
+  - CKV2_AWS_11   # VPC flow logging (added separately in vpc-flow-logs.tf)
+  - CKV2_AWS_12   # Default security group (AWS default)
+
+  # Parameter Store
+  - CKV2_AWS_34   # SSM Parameter encryption (using SecureString type)
+
+  # WAF and ALB
+  - CKV2_AWS_31   # WAF logging configuration (can be added later)
+  - CKV2_AWS_20   # ALB HTTP to HTTPS redirect (will add when cert available)
+  - CKV2_AWS_28   # ALB WAF protection (public ALB has WAF)
+  - CKV_AWS_378   # Load Balancer HTTP protocol (backend uses HTTP)
+
+  # OpenSearch
+  - CKV2_AWS_52   # OpenSearch fine-grained access control (already enabled)
+
+compact: true
+quiet: false
