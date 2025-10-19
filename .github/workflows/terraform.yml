@@ -21,272 +21,146 @@ env:
   DOCKER_IMAGE: terraform-tooling
 
 jobs:
-  # ============================================================================
-  # BUILD DOCKER IMAGE
-  # ============================================================================
   build-image:
     name: Build Tooling Image
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build Docker image
-        uses: docker/build-push-action@v5
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v5
         with:
           context: .
           file: ./Dockerfile
-          push: false
           tags: ${{ env.DOCKER_IMAGE }}:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           outputs: type=docker,dest=/tmp/${{ env.DOCKER_IMAGE }}.tar
-
-      - name: Upload Docker image artifact
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: docker-image
           path: /tmp/${{ env.DOCKER_IMAGE }}.tar
           retention-days: 1
 
-  # ============================================================================
-  # PULL REQUEST VALIDATION (Plan Only - No Apply)
-  # ============================================================================
   pull_request:
-    name: PR Validation - ${{ matrix.environment }}
+    name: PR - ${{ matrix.environment }}
     runs-on: ubuntu-latest
     needs: build-image
     if: github.event_name == 'pull_request'
-
     permissions:
       contents: read
       pull-requests: write
-
     strategy:
       matrix:
         environment: [production]
       fail-fast: false
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Download Docker image
-        uses: actions/download-artifact@v4
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
         with:
           name: docker-image
           path: /tmp
+      - name: Load image
+        run: docker load --input /tmp/${{ env.DOCKER_IMAGE }}.tar
 
-      - name: Load Docker image
-        run: |
-          docker load --input /tmp/${{ env.DOCKER_IMAGE }}.tar
-          docker image ls -a
-
-      - name: Run PR validation in Docker
-        id: pr-checks
+      - name: Run validation
+        id: validate
         run: |
           docker run --rm \
             -v ${{ github.workspace }}:/workspace \
             -e AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }} \
             -e AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }} \
             -e AWS_REGION=${{ env.AWS_REGION }} \
-            -e ENV=${{ matrix.environment }} \
             ${{ env.DOCKER_IMAGE }}:${{ github.sha }} \
-            bash -c "
-              set -e
-              echo '======================================'
-              echo 'Starting PR validation checks'
-              echo 'Environment: ${{ matrix.environment }}'
-              echo '======================================'
-
-              # Run all checks and plan (no apply!)
-              make pull_request ENV=${{ matrix.environment }}
-
-              echo '======================================'
-              echo 'Extracting plan output'
-              echo '======================================'
-
-              if [ -f environments/${{ matrix.environment }}/tfplan ]; then
-                cd environments/${{ matrix.environment }}
-                terraform show -no-color tfplan > tfplan.txt 2>&1 || echo 'Plan output could not be extracted' > tfplan.txt
-                echo '✓ Plan output saved to tfplan.txt'
-              else
-                echo '⚠ No plan file found'
-                mkdir -p environments/${{ matrix.environment }}
-                echo 'No plan was generated' > environments/${{ matrix.environment }}/tfplan.txt
-              fi
-            "
+            make pull_request ENV=${{ matrix.environment }}
         continue-on-error: true
 
-      - name: Verify plan output exists
+      - name: Extract plan
         if: always()
         run: |
-          ls -la environments/${{ matrix.environment }}/ || echo "Environment directory not found"
-          if [ -f environments/${{ matrix.environment }}/tfplan.txt ]; then
-            echo "✓ Plan output file exists"
-            wc -l environments/${{ matrix.environment }}/tfplan.txt
-          else
-            echo "⚠ Creating placeholder plan output"
-            mkdir -p environments/${{ matrix.environment }}
-            echo "Plan output was not generated" > environments/${{ matrix.environment }}/tfplan.txt
-          fi
+          cd environments/${{ matrix.environment }}
+          [ -f tfplan ] && terraform show -no-color tfplan > tfplan.txt || echo "No plan generated" > tfplan.txt
 
-      - name: Upload plan artifact
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: tfplan-${{ matrix.environment }}-${{ github.sha }}
-          path: |
-            environments/${{ matrix.environment }}/tfplan
-            environments/${{ matrix.environment }}/tfplan.txt
+          name: tfplan-${{ matrix.environment }}
+          path: environments/${{ matrix.environment }}/tfplan*
           retention-days: 30
 
-      - name: Comment PR with results
-        uses: actions/github-script@v7
-        if: github.event_name == 'pull_request' && always()
+      - uses: actions/github-script@v7
+        if: always()
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const fs = require('fs');
-
-            let planOutput = 'Plan output not available';
             const planPath = 'environments/${{ matrix.environment }}/tfplan.txt';
+            let plan = 'Plan not available';
 
-            try {
-              if (fs.existsSync(planPath)) {
-                planOutput = fs.readFileSync(planPath, 'utf8');
-                if (planOutput.length > 60000) {
-                  planOutput = planOutput.substring(0, 60000) + '\n\n... (truncated - download artifact for full plan)';
-                }
-              }
-            } catch (error) {
-              planOutput = `Error reading plan: ${error.message}`;
+            if (fs.existsSync(planPath)) {
+              plan = fs.readFileSync(planPath, 'utf8');
+              if (plan.length > 60000) plan = plan.substring(0, 60000) + '\n\n...(truncated)';
             }
 
-            const status = '${{ steps.pr-checks.outcome }}' === 'success' ? '✅ PASSED' : '❌ FAILED';
-            const emoji = '${{ steps.pr-checks.outcome }}' === 'success' ? '🎉' : '⚠️';
+            const status = '${{ steps.validate.outcome }}' === 'success' ? '✅ PASSED' : '❌ FAILED';
+            const body = `## ${status} Terraform PR Validation
 
-            const output = `
-            ## ${emoji} Terraform PR Validation Results
+            **Environment:** ${{ matrix.environment }}
 
-            **Environment:** \`${{ matrix.environment }}\`
-            **Status:** ${status}
-            **Mode:** 🔍 Plan Only (No Deployment)
-
-            ### 🔍 Checks Performed:
-            - ✅ Terraform Format Check
-            - ✅ Terraform Validate
-            - ✅ TFLint Analysis
-            - ✅ Module Tests
-            - ✅ Security Scans (TFSec, Trivy, Checkov)
-            - ✅ Terraform Plan
-
-            <details>
-            <summary>📋 View Terraform Plan</summary>
+            <details><summary>📋 Plan</summary>
 
             \`\`\`terraform
-            ${planOutput}
+            ${plan}
             \`\`\`
+            </details>`;
 
-            </details>
-
-            <details>
-            <summary>💰 Cost Estimate</summary>
-
-            Run \`make cost ENV=${{ matrix.environment }}\` locally to estimate costs with openinfraquote.
-
-            </details>
-
-            ---
-
-            <sub>**Note:** This workflow only validates and plans. No infrastructure will be deployed. | [Workflow Run #${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})</sub>
-            `;
-
-            const { data: comments } = await github.rest.issues.listComments({
+            const {data: comments} = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
             });
 
-            const botComment = comments.find(comment =>
-              comment.user.type === 'Bot' &&
-              comment.body.includes('Terraform PR Validation Results')
-            );
+            const existing = comments.find(c => c.user.type === 'Bot' && c.body.includes('${{ matrix.environment }}'));
 
-            if (botComment) {
+            if (existing) {
               await github.rest.issues.updateComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                comment_id: botComment.id,
-                body: output
+                comment_id: existing.id,
+                body
               });
             } else {
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: context.issue.number,
-                body: output
+                body
               });
             }
 
-      - name: Set job status
-        if: steps.pr-checks.outcome != 'success'
-        run: |
-          echo "::error::PR validation checks failed"
-          exit 1
+      - if: steps.validate.outcome != 'success'
+        run: exit 1
 
-  # ============================================================================
-  # MERGE VALIDATION (Plan Only - Still No Deploy!)
-  # ============================================================================
   merge-validation:
-    name: Merge Validation - ${{ matrix.environment }}
+    name: Merge - ${{ matrix.environment }}
     runs-on: ubuntu-latest
     needs: build-image
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-
-    permissions:
-      contents: read
-
+    if: github.event_name == 'push'
     strategy:
       matrix:
         environment: [production]
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Download Docker image
-        uses: actions/download-artifact@v4
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
         with:
           name: docker-image
           path: /tmp
-
-      - name: Load Docker image
-        run: |
-          docker load --input /tmp/${{ env.DOCKER_IMAGE }}.tar
-
-      - name: Run validation and plan
-        run: |
+      - run: docker load --input /tmp/${{ env.DOCKER_IMAGE }}.tar
+      - run: |
           docker run --rm \
             -v ${{ github.workspace }}:/workspace \
             -e AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }} \
             -e AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }} \
             -e AWS_REGION=${{ env.AWS_REGION }} \
-            -e ENV=${{ matrix.environment }} \
             ${{ env.DOCKER_IMAGE }}:${{ github.sha }} \
-            bash -c "make pull_request ENV=${{ matrix.environment }}"
-
-      - name: Create summary
-        run: |
-          echo "## ✅ Merge Validation Complete" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Environment:** ${{ matrix.environment }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Mode:** Plan Only (No Deployment)" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "All validation checks passed. Infrastructure changes planned successfully." >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "⚠️ **Note:** To deploy this infrastructure, you would need to run \`make apply ENV=${{ matrix.environment }}\` manually." >> $GITHUB_STEP_SUMMARY
+            make pull_request ENV=${{ matrix.environment }}
