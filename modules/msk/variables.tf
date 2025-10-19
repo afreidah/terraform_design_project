@@ -90,3 +90,15 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "cloudwatch_kms_key_id" {
+  description = "KMS key ID for CloudWatch Logs encryption"
+  type        = string
+  default     = null
+}
+
+variable "cloudwatch_retention_days" {
+  description = "CloudWatch log retention in days"
+  type        = number
+  default     = 365
+}

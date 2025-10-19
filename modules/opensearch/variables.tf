@@ -4,7 +4,7 @@ variable "domain_name" {
 }
 
 variable "engine_version" {
-  description = "OpenSearch engine version"
+  description = "OpenSearch or Elasticsearch engine version"
   type        = string
   default     = "OpenSearch_2.11"
 }
@@ -40,7 +40,7 @@ variable "dedicated_master_count" {
 }
 
 variable "zone_awareness_enabled" {
-  description = "Enable zone awareness (Multi-AZ)"
+  description = "Enable zone awareness (multi-AZ)"
   type        = bool
   default     = true
 }
@@ -57,26 +57,28 @@ variable "ebs_enabled" {
   default     = true
 }
 
-variable "ebs_volume_type" {
+variable "volume_type" {
   description = "EBS volume type"
   type        = string
   default     = "gp3"
 }
 
-variable "ebs_volume_size" {
+variable "volume_size" {
   description = "EBS volume size in GB"
   type        = number
   default     = 100
 }
 
-variable "subnet_ids" {
-  description = "List of subnet IDs for VPC endpoints"
-  type        = list(string)
+variable "iops" {
+  description = "IOPS for gp3 volumes"
+  type        = number
+  default     = 3000
 }
 
-variable "security_group_ids" {
-  description = "List of security group IDs"
-  type        = list(string)
+variable "throughput" {
+  description = "Throughput in MB/s for gp3 volumes"
+  type        = number
+  default     = 125
 }
 
 variable "encrypt_at_rest_enabled" {
@@ -86,7 +88,7 @@ variable "encrypt_at_rest_enabled" {
 }
 
 variable "kms_key_id" {
-  description = "KMS key ID for encryption"
+  description = "KMS key ID for encryption at rest"
   type        = string
   default     = null
 }
@@ -97,47 +99,61 @@ variable "node_to_node_encryption_enabled" {
   default     = true
 }
 
-variable "enforce_https" {
-  description = "Enforce HTTPS for domain endpoint"
-  type        = bool
-  default     = true
+variable "domain_endpoint_options" {
+  description = "Domain endpoint options"
+  type = object({
+    enforce_https       = bool
+    tls_security_policy = string
+  })
+  default = {
+    enforce_https       = true
+    tls_security_policy = "Policy-Min-TLS-1-2-2019-07"
+  }
 }
 
-variable "tls_security_policy" {
-  description = "TLS security policy"
-  type        = string
-  default     = "Policy-Min-TLS-1-2-2019-07"
+variable "advanced_security_options" {
+  description = "Advanced security options"
+  type = object({
+    enabled                        = bool
+    internal_user_database_enabled = bool
+    master_user_name               = string
+    master_user_password           = string
+  })
+  sensitive = true
 }
 
-variable "advanced_security_options_enabled" {
-  description = "Enable fine-grained access control"
-  type        = bool
-  default     = true
+variable "subnet_ids" {
+  description = "List of subnet IDs for the OpenSearch domain"
+  type        = list(string)
 }
 
-variable "internal_user_database_enabled" {
-  description = "Enable internal user database"
-  type        = bool
-  default     = true
-}
-
-variable "master_user_name" {
-  description = "Master user name"
-  type        = string
-  default     = "admin"
-  sensitive   = true
-}
-
-variable "master_user_password" {
-  description = "Master user password"
-  type        = string
-  sensitive   = true
+variable "security_group_ids" {
+  description = "List of security group IDs"
+  type        = list(string)
 }
 
 variable "automated_snapshot_start_hour" {
-  description = "Hour to start automated snapshots (0-23)"
+  description = "Hour during which automated snapshots are taken"
   type        = number
   default     = 3
+}
+
+variable "cloudwatch_kms_key_id" {
+  description = "KMS key ID for CloudWatch Logs encryption"
+  type        = string
+  default     = null
+}
+
+variable "cloudwatch_retention_days" {
+  description = "CloudWatch log retention in days"
+  type        = number
+  default     = 365
+}
+
+variable "enable_audit_logs" {
+  description = "Enable audit logging"
+  type        = bool
+  default     = true
 }
 
 variable "tags" {

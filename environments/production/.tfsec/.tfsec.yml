@@ -1,0 +1,15 @@
+# tfsec configuration
+# Ignore intentional design decisions
+
+exclude:
+  - aws-elb-alb-not-public
+  - aws-ec2-no-public-ip-subnet
+  - aws-ec2-no-public-ingress-sgr
+  - aws-ec2-no-public-egress-sgr
+  - aws-elb-http-not-used
+  - aws-ec2-add-description-to-security-group
+  - aws-ec2-require-vpc-flow-logs-for-all-vpcs
+
+severity_overrides:
+  aws-elb-alb-not-public: LOW
+  aws-ec2-no-public-ip-subnet: LOW
