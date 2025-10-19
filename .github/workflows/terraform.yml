@@ -64,7 +64,7 @@ jobs:
         run: docker load --input /tmp/${{ env.DOCKER_IMAGE }}.tar
 
       - name: Setup Infracost
-        uses: infracost/actions/setup@v2
+        uses: infracost/actions/setup@v3
         with:
           api-key: ${{ secrets.INFRACOST_API_KEY }}
 
@@ -96,7 +96,7 @@ jobs:
 
       - name: Post Infracost comment
         if: always()
-        uses: infracost/actions/comment@v2
+        uses: infracost/actions/comment@v1
         with:
           path: /tmp/infracost-${{ matrix.environment }}.json
           behavior: update
