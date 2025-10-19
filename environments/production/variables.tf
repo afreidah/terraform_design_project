@@ -48,13 +48,6 @@ variable "ec2_instance_type" {
   default     = "t3.medium"
 }
 
-# Optional: SSL Certificate
-variable "ssl_certificate_arn" {
-  description = "ARN of SSL certificate in ACM for HTTPS"
-  type        = string
-  default     = null
-}
-
 # Optional: KMS Key for encryption
 variable "kms_key_id" {
   description = "KMS key ID for encryption (RDS, Performance Insights, etc.)"

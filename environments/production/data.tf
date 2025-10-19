@@ -5,14 +5,6 @@
 # Current AWS account
 data "aws_caller_identity" "current" {}
 
-# Current AWS region
-data "aws_region" "current" {}
-
-# Available availability zones
-data "aws_availability_zones" "available" {
-  state = "available"
-}
-
 # -----------------------------------------------------------------------------
 # PARAMETER STORE (for reading Parameter Store values)
 # -----------------------------------------------------------------------------
