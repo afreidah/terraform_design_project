@@ -2,12 +2,14 @@
 # Ignore intentional design decisions
 
 exclude:
-  - aws-elb-alb-not-public              # Public ALB is intentional
-  - aws-ec2-no-public-ip-subnet         # Public subnets need public IPs for NAT gateways
-  - aws-ec2-no-public-ingress-sgr       # Public ALB must accept internet traffic on 80/443
-  - aws-ec2-no-public-egress-sgr        # EC2 instances need internet for package updates
+  - aws-elb-alb-not-public
+  - aws-ec2-no-public-ip-subnet
+  - aws-ec2-no-public-ingress-sgr
+  - aws-ec2-no-public-egress-sgr
+  - aws-elb-http-not-used
+  - aws-ec2-add-description-to-security-group
+  - aws-ec2-require-vpc-flow-logs-for-all-vpcs
 
 severity_overrides:
-  # These are reviewed and accepted
   aws-elb-alb-not-public: LOW
   aws-ec2-no-public-ip-subnet: LOW

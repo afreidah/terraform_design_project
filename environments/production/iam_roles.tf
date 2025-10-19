@@ -35,7 +35,9 @@ data "aws_iam_policy_document" "parameter_store_access" {
     actions = [
       "kms:Decrypt"
     ]
-    resources = ["*"]
+    # FIXED: Specific key instead of wildcard
+    resources = [module.kms_parameter_store.key_arn]
+
     condition {
       test     = "StringEquals"
       variable = "kms:ViaService"
