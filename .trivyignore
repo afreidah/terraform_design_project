@@ -20,3 +20,7 @@ AVD-AWS-0177
 
 # Security group descriptions provided via variable
 AVD-AWS-0099
+
+# VPC Flow Logs requires wildcard to create dynamic log streams
+# The wildcard is scoped to a specific log group, not all CloudWatch Logs
+AVD-AWS-0057

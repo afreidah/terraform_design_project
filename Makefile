@@ -105,14 +105,8 @@ test: ## Run terraform test on all modules
 	@failed=0; \
 	for dir in modules/*/; do \
 		echo "$(YELLOW)Testing $$dir...$(NC)"; \
-		if [ -d "$$dir/tests" ]; then \
-			cd $$dir && terraform init -backend=false && terraform test || failed=$$((failed + 1)); \
-			cd ../..; \
-		else \
-			echo "$(YELLOW)  No tests found, validating only...$(NC)"; \
-			cd $$dir && terraform init -backend=false && terraform validate || failed=$$((failed + 1)); \
-			cd ../..; \
-		fi; \
+		cd $$dir && terraform init -backend=false && terraform test -parallelism=10 || failed=$$((failed + 1)); \
+		cd ../..; \
 	done; \
 	if [ $$failed -gt 0 ]; then \
 		echo "$(RED)✗ $$failed module(s) failed$(NC)"; \
@@ -126,7 +120,7 @@ test: ## Run terraform test on all modules
 plan: check-env ## Create Terraform execution plan
 	@echo "$(BLUE)Creating plan for $(ENV)...$(NC)"
 	cd $(TERRAFORM_DIR) && terraform init
-	cd $(TERRAFORM_DIR) && terraform plan -out=$(PLAN_FILE)
+	cd $(TERRAFORM_DIR) && terraform plan -parallelism=20 -out=$(PLAN_FILE)
 	@echo "$(GREEN)✓ Plan created$(NC)"
 
 plan-target: check-env ## Plan specific target (usage: make plan-target TARGET=module.vpc)
@@ -203,12 +197,13 @@ clean: check-env ## Clean temporary files for environment
 	cd $(TERRAFORM_DIR) && rm -f $(PLAN_FILE) *.tfstate.backup
 	@echo "$(GREEN)✓ Cleanup complete$(NC)"
 
-clean-all: ## Clean all environments
-	@echo "$(BLUE)Cleaning all environments...$(NC)"
+clean-all: ## Clean all environments and modules
+	@echo "$(BLUE)Cleaning all environments and modules...$(NC)"
 	find environments -name "$(PLAN_FILE)" -delete
 	find environments -name "*.tfstate.backup" -delete
 	find . -type d -name ".terraform" -exec rm -rf {} + 2>/dev/null || true
-	@echo "$(GREEN)✓ All environments cleaned$(NC)"
+	find modules -name ".terraform.lock.hcl" -delete
+	@echo "$(GREEN)✓ All environments and modules cleaned$(NC)"
 
 ##@ Docker
 

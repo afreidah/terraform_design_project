@@ -23,6 +23,8 @@ exclude:
   - aws-ec2-require-vpc-flow-logs-for-all-vpcs
   # RDS deletion protection - set at environment level, not module level
   - aws-rds-enable-deletion-protection
+    # VPC Flow Logs requires CreateLogStream with wildcard for dynamic stream names
+  - aws-iam-no-policy-wildcards
 
 severity_overrides:
   aws-elb-alb-not-public: LOW

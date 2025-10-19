@@ -1,8 +1,19 @@
 # SSM Parameter Store
 # Secure storage for application secrets and configuration
 
-# Random password for RDS
+# Random passwords
 resource "random_password" "db_password" {
+  length  = 32
+  special = true
+}
+
+resource "random_password" "redis_auth_token" {
+  length           = 32
+  special          = false
+  override_special = "!&#$^<>-"
+}
+
+resource "random_password" "opensearch_master_password" {
   length  = 32
   special = true
 }
@@ -26,6 +37,20 @@ module "parameter_store" {
       value       = module.rds.username
       description = "RDS master username"
       type        = "String"
+    }
+
+    # Redis credentials
+    "/${var.environment}/redis/auth_token" = {
+      value       = random_password.redis_auth_token.result
+      description = "Redis AUTH token"
+      type        = "SecureString"
+    }
+
+    # OpenSearch credentials
+    "/${var.environment}/opensearch/master_password" = {
+      value       = random_password.opensearch_master_password.result
+      description = "OpenSearch master user password"
+      type        = "SecureString"
     }
 
     # Application configuration

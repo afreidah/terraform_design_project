@@ -27,7 +27,7 @@ module "rds" {
   maintenance_window      = "sun:04:00-sun:05:00"
 
   # High availability
-  multi_az            = false
+  multi_az            = true
   publicly_accessible = false
 
   # Deletion protection
