@@ -128,3 +128,9 @@ variable "eks_node_disk_size" {
   type        = number
   default     = 50
 }
+
+variable "devops_ip_ranges" {
+  description = "CIDR blocks for DevOps access to admin ports (SSH, RDP)"
+  type        = list(string)
+  default     = ["0.0.0.0/0"] # TODO: Restrict to VPN/office IPs in production
+}

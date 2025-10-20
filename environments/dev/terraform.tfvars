@@ -1,6 +1,6 @@
 # Environment Configuration
 region      = "us-east-1"
-environment = "production"
+environment = "dev"
 
 # VPC Configuration
 vpc_cidr = "10.0.0.0/16"

@@ -104,10 +104,84 @@ GitHub Actions runs on pull requests:
 
 - [ ] Update `ec2_ami_id` to latest AMI
 - [ ] Restrict `eks_public_access_cidrs`
+- [ ] Restrict `devops_ip_ranges` to VPN/office IPs
 - [ ] Configure SSL certificate
 - [ ] Verify `/health` endpoint exists
 - [ ] Set up CloudWatch alarms
 - [ ] Test RDS backup restoration
+
+## Network Architecture Details
+
+### Route Tables
+
+**Public Subnets** (`10.0.1-3.0/24`):
+```
+Destination       Target
+10.0.0.0/16      local
+0.0.0.0/0        igw-xxxxx (Internet Gateway)
+```
+- Routes all internet traffic through Internet Gateway
+- Used by: ALB, NAT Gateways
+
+**Private App Subnets** (`10.0.11-13.0/24`) - One route table per AZ:
+```
+Destination       Target
+10.0.0.0/16      local
+0.0.0.0/0        nat-xxxxx (NAT Gateway in same AZ)
+```
+- Routes internet traffic through NAT Gateway for HA
+- Used by: EC2 instances, EKS nodes
+- Enables pulling updates and accessing AWS services
+
+**Private Data Subnets** (`10.0.21-23.0/24`) - Shared route table:
+```
+Destination       Target
+10.0.0.0/16      local
+0.0.0.0/0        nat-xxxxx (NAT Gateway in AZ-1)
+```
+- Routes internet traffic through first NAT Gateway
+- Used by: RDS, ElastiCache, OpenSearch, MSK
+- Minimal internet access needed for maintenance
+
+### Security Model
+
+- **Public tier**: Internet-facing resources only (ALB, NAT)
+- **Private app tier**: Application logic, never directly exposed
+- **Private data tier**: Databases, completely isolated from internet
+- **Admin access**: SSH restricted to `devops_ip_ranges` variable
+- **Application access**: Ports 8080/80 only accessible via load balancers
+
+### EKS Access Control
+
+**DevOps Team** - Full cluster admin:
+```bash
+# Assume the DevOps role
+aws sts assume-role \
+  --role-arn arn:aws:iam::ACCOUNT_ID:role/production-eks-devops-role \
+  --role-session-name devops-session \
+  --external-id production
+
+# Configure kubectl
+aws eks update-kubeconfig --name production-eks --region us-east-1
+kubectl get nodes  # Full access
+```
+
+**Developers Team** - Read-only access:
+```bash
+# Assume the Developers role
+aws sts assume-role \
+  --role-arn arn:aws:iam::ACCOUNT_ID:role/production-eks-developers-role \
+  --role-session-name dev-session \
+  --external-id production
+
+# Apply read-only ClusterRole (DevOps does this once)
+kubectl apply -f examples/rbac/read-only-clusterrole.yaml
+
+# Developers can now view resources
+kubectl get pods --all-namespaces
+kubectl logs pod-name
+# But cannot modify anything
+```
 
 ## Troubleshooting
 
