@@ -131,17 +131,27 @@ jobs:
 
       - name: Post Infracost comment
         if: always() && hashFiles('infracost-${{ matrix.environment }}.json') != ''
-        run: |
-          docker run --rm \
-            -v ${{ github.workspace }}:/workspace \
-            -w /workspace \
-            -e INFRACOST_API_KEY=${{ secrets.INFRACOST_API_KEY }} \
-            infracost/infracost:latest comment github \
-            --path /workspace/infracost-${{ matrix.environment }}.json \
-            --repo ${{ github.repository }} \
-            --pull-request ${{ github.event.pull_request.number }} \
-            --github-token ${{ secrets.GITHUB_TOKEN }} \
-            --behavior new
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const infracostJson = JSON.parse(fs.readFileSync('infracost-${{ matrix.environment }}.json', 'utf8'));
+
+            // Format the Infracost output
+            const exec = require('child_process').execSync;
+            const infracostTable = exec(
+              'docker run --rm -v ${{ github.workspace }}:/workspace infracost/infracost:latest output --path /workspace/infracost-${{ matrix.environment }}.json --format github-comment',
+              { encoding: 'utf8' }
+            );
+
+            const body = `## 💰 Infracost Report - **${{ matrix.environment }}**\n\n${infracostTable}`;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body
+            });
 
       - uses: actions/upload-artifact@v4
         if: always()
