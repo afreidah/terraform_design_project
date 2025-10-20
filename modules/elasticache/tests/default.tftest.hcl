@@ -12,7 +12,7 @@ variables {
   cluster_id         = "test-redis"
   subnet_ids         = ["subnet-11111111", "subnet-22222222", "subnet-33333333"]
   security_group_ids = ["sg-redis12345"]
-  
+
   # Test helper variables
   test_kms_key_id    = "arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012"
   test_sns_topic_arn = "arn:aws:sns:us-east-1:123456789012:redis-notifications"
@@ -27,7 +27,7 @@ run "security_defaults" {
 
   # Assert encryption at rest is enabled by default
   assert {
-    condition     = aws_elasticache_replication_group.this.at_rest_encryption_enabled == true
+    condition     = tobool(aws_elasticache_replication_group.this.at_rest_encryption_enabled) == true
     error_message = "Encryption at rest must be enabled by default"
   }
 
@@ -308,7 +308,7 @@ run "auto_minor_version_upgrade" {
 
   # Assert auto minor version upgrade is enabled
   assert {
-    condition     = aws_elasticache_replication_group.this.auto_minor_version_upgrade == true
+    condition     = tobool(aws_elasticache_replication_group.this.auto_minor_version_upgrade) == true
     error_message = "Auto minor version upgrade should be enabled by default"
   }
 }
