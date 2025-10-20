@@ -36,8 +36,9 @@ variable "private_data_subnet_cidrs" {
 }
 
 variable "ec2_ami_id" {
-  description = "AMI ID for EC2 instances"
+  description = "AMI ID for EC2 instances (if not specified, latest Amazon Linux 2 will be used)"
   type        = string
+  default     = null
 }
 
 variable "ec2_instance_type" {
@@ -50,4 +51,16 @@ variable "kms_key_id" {
   description = "KMS key ID for encryption"
   type        = string
   default     = null
+}
+
+variable "ssl_certificate_arn" {
+  description = "ARN of ACM SSL certificate for HTTPS listeners (optional)"
+  type        = string
+  default     = null
+}
+
+variable "eks_public_access_cidrs" {
+  description = "CIDR blocks that can access the EKS public API endpoint. Restrict to VPN/office IPs in production."
+  type        = list(string)
+  default     = ["0.0.0.0/0"]
 }

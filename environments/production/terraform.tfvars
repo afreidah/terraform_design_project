@@ -30,8 +30,15 @@ private_data_subnet_cidrs = [
 ]
 
 # EC2 Configuration
-ec2_ami_id        = "ami-0c55b159cbfafe1f0" # Amazon Linux 2 (update for your region)
+# AMI ID is dynamically fetched in main.tf - no need to specify here
+# Uncomment below to override with specific AMI
+# ec2_ami_id = "ami-xxxxx"
 ec2_instance_type = "t3.medium"
+
+# EKS Configuration
+# Restrict to your VPN/office IP ranges in production
+# Example: ["203.0.113.0/24", "198.51.100.0/24"]
+eks_public_access_cidrs = ["0.0.0.0/0"] # TODO: Restrict before production deployment
 
 # Optional: SSL Certificate ARN (uncomment when you have a cert)
 # ssl_certificate_arn = "arn:aws:acm:us-east-1:123456789012:certificate/12345678-1234-1234-1234-123456789012"

@@ -8,6 +8,11 @@ output "alb_arn" {
   value       = aws_lb.this.arn
 }
 
+output "alb_arn_suffix" {
+  description = "ARN suffix of the ALB (for use with CloudWatch metrics)"
+  value       = aws_lb.this.arn_suffix
+}
+
 output "alb_dns_name" {
   description = "DNS name of the ALB"
   value       = aws_lb.this.dns_name
@@ -21,6 +26,11 @@ output "alb_zone_id" {
 output "target_group_arns" {
   description = "Map of target group ARNs"
   value       = { for k, v in aws_lb_target_group.this : k => v.arn }
+}
+
+output "target_group_arn_suffixes" {
+  description = "Map of target group ARN suffixes (for use with CloudWatch metrics)"
+  value       = { for k, v in aws_lb_target_group.this : k => v.arn_suffix }
 }
 
 output "target_group_names" {

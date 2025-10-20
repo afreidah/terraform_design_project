@@ -40,5 +40,5 @@ output "application_logs_log_group_name" {
 
 output "audit_logs_log_group_name" {
   description = "CloudWatch log group name for audit logs"
-  value       = var.enable_audit_logs ? aws_cloudwatch_log_group.audit_logs[0].name : null
+  value       = var.enable_audit_logs ? one(values(aws_cloudwatch_log_group.audit_logs)[*].name) : null
 }

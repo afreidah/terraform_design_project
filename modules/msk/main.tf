@@ -1,10 +1,10 @@
 # CloudWatch Log Group
 resource "aws_cloudwatch_log_group" "this" {
-  count = var.cloudwatch_logs_enabled ? 1 : 0
+  for_each = var.cloudwatch_logs_enabled ? toset(["enabled"]) : toset([])
 
   name              = "/aws/msk/${var.cluster_name}"
-  retention_in_days = var.cloudwatch_retention_days # CHANGED
-  kms_key_id        = var.cloudwatch_kms_key_id     # ADDED
+  retention_in_days = var.cloudwatch_retention_days
+  kms_key_id        = var.cloudwatch_kms_key_id
 
   tags = var.tags
 }
@@ -42,7 +42,7 @@ resource "aws_msk_cluster" "this" {
     broker_logs {
       cloudwatch_logs {
         enabled   = var.cloudwatch_logs_enabled
-        log_group = var.cloudwatch_logs_enabled ? aws_cloudwatch_log_group.this[0].name : null
+        log_group = var.cloudwatch_logs_enabled ? one(values(aws_cloudwatch_log_group.this)[*].name) : null
       }
 
       s3 {

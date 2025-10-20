@@ -38,8 +38,9 @@ variable "private_data_subnet_cidrs" {
 
 # EC2 Configuration
 variable "ec2_ami_id" {
-  description = "AMI ID for EC2 instances"
+  description = "AMI ID for EC2 instances (if not specified, latest Amazon Linux 2 will be used)"
   type        = string
+  default     = null
 }
 
 variable "ec2_instance_type" {
@@ -51,6 +52,12 @@ variable "ec2_instance_type" {
 # Optional: KMS Key for encryption
 variable "kms_key_id" {
   description = "KMS key ID for encryption (RDS, Performance Insights, etc.)"
+  type        = string
+  default     = null
+}
+
+variable "ssl_certificate_arn" {
+  description = "ARN of ACM SSL certificate for HTTPS listeners (optional)"
   type        = string
   default     = null
 }

@@ -13,7 +13,8 @@ module "alb_public" {
   security_group_ids = [module.security_groups["alb_public"].security_group_id]
 
   # HTTPS Configuration
-  certificate_arn            = null # Set to your ACM cert ARN when available
+  # SSL certificate required for production - obtain from AWS Certificate Manager
+  certificate_arn            = var.ssl_certificate_arn
   enable_deletion_protection = true
   drop_invalid_header_fields = true
 
@@ -25,6 +26,8 @@ module "alb_public" {
   waf_web_acl_arn = module.waf.web_acl_arn
 
   # Target Groups
+  # NOTE: Application must expose /health endpoint returning HTTP 200
+  # Customize health_check.path if using a different endpoint
   target_groups = {
     ec2 = {
       port                 = 8080
@@ -36,7 +39,7 @@ module "alb_public" {
         healthy_threshold   = 3
         interval            = 30
         matcher             = "200"
-        path                = "/health"
+        path                = "/health" # Application must expose this endpoint
         port                = "traffic-port"
         protocol            = "HTTP"
         timeout             = 5
@@ -77,6 +80,7 @@ module "alb_internal" {
   waf_web_acl_arn = null
 
   # Target Groups
+  # NOTE: Application must expose /health endpoint returning HTTP 200
   target_groups = {
     ec2 = {
       port                 = 8080
@@ -88,7 +92,7 @@ module "alb_internal" {
         healthy_threshold   = 3
         interval            = 30
         matcher             = "200"
-        path                = "/health"
+        path                = "/health" # Application must expose this endpoint
         port                = "traffic-port"
         protocol            = "HTTP"
         timeout             = 5
