@@ -138,6 +138,7 @@ jobs:
             --repo ${{ github.repository }} \
             --pull-request ${{ github.event.pull_request.number }} \
             --github-token ${{ secrets.GITHUB_TOKEN }} \
+            --tag ${{ matrix.environment }} \
             --behavior update
 
       - uses: actions/upload-artifact@v4
