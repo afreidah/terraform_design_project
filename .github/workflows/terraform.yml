@@ -26,7 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v2
       - uses: docker/build-push-action@v5
         with:
           context: .
@@ -63,7 +63,7 @@ jobs:
       - name: Load image
         run: docker load --input /tmp/${{ env.DOCKER_IMAGE }}.tar
 
-      - name: Run validation
+      - name: Run validation and generate plan
         id: validate
         run: |
           docker run --rm \
@@ -78,14 +78,79 @@ jobs:
       - name: Extract plan
         if: always()
         run: |
-          cd environments/${{ matrix.environment }}
-          [ -f tfplan ] && terraform show -no-color tfplan > tfplan.txt || echo "No plan generated" > tfplan.txt
+          if [ -f environments/${{ matrix.environment }}/tfplan ]; then
+            echo "✅ Plan file found, converting to text and JSON..."
+            # Convert to text for PR comment
+            docker run --rm \
+              -v ${{ github.workspace }}:/workspace \
+              -w /workspace/environments/${{ matrix.environment }} \
+              ${{ env.DOCKER_IMAGE }}:${{ github.sha }} \
+              terraform show -no-color tfplan > environments/${{ matrix.environment }}/tfplan.txt
+            echo "Text plan size: $(wc -l < environments/${{ matrix.environment }}/tfplan.txt) lines"
+
+            # Convert to JSON for Infracost
+            docker run --rm \
+              -v ${{ github.workspace }}:/workspace \
+              -w /workspace/environments/${{ matrix.environment }} \
+              ${{ env.DOCKER_IMAGE }}:${{ github.sha }} \
+              terraform show -json tfplan > environments/${{ matrix.environment }}/tfplan.json
+            echo "JSON plan size: $(wc -c < environments/${{ matrix.environment }}/tfplan.json) bytes"
+          else
+            echo "❌ No plan file found"
+            echo "No plan generated" > environments/${{ matrix.environment }}/tfplan.txt
+          fi
+
+      - name: Generate Infracost breakdown
+        if: always() && hashFiles('environments/${{ matrix.environment }}/tfplan.json') != ''
+        run: |
+          echo "🔍 Generating Infracost breakdown from plan..."
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace \
+            -w /workspace \
+            -e INFRACOST_API_KEY=${{ secrets.INFRACOST_API_KEY }} \
+            infracost/infracost:latest breakdown \
+            --path environments/${{ matrix.environment }}/tfplan.json \
+            --format json \
+            --out-file /workspace/infracost-${{ matrix.environment }}.json
+
+          if [ -f infracost-${{ matrix.environment }}.json ]; then
+            echo "✅ Infracost JSON generated successfully"
+            echo "File size: $(wc -c < infracost-${{ matrix.environment }}.json) bytes"
+            echo ""
+            echo "Preview of cost estimate:"
+            docker run --rm \
+              -v ${{ github.workspace }}:/workspace \
+              -w /workspace \
+              infracost/infracost:latest output \
+              --path infracost-${{ matrix.environment }}.json \
+              --format table
+          else
+            echo "❌ Infracost JSON file not created"
+          fi
+
+      - name: Post Infracost comment
+        if: always() && hashFiles('infracost-${{ matrix.environment }}.json') != ''
+        run: |
+          echo "💬 Posting Infracost comment to PR..."
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace \
+            -w /workspace \
+            -e INFRACOST_API_KEY=${{ secrets.INFRACOST_API_KEY }} \
+            infracost/infracost:latest comment github \
+            --path /workspace/infracost-${{ matrix.environment }}.json \
+            --repo ${{ github.repository }} \
+            --pull-request ${{ github.event.pull_request.number }} \
+            --github-token ${{ secrets.GITHUB_TOKEN }} \
+            --behavior update
+          echo "✅ Infracost comment posted"
 
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: tfplan-${{ matrix.environment }}
-          path: environments/${{ matrix.environment }}/tfplan*
+          path: |
+            environments/${{ matrix.environment }}/tfplan*
+            infracost-${{ matrix.environment }}.json
           retention-days: 30
 
       - uses: actions/github-script@v7
@@ -98,7 +163,15 @@ jobs:
 
             if (fs.existsSync(planPath)) {
               plan = fs.readFileSync(planPath, 'utf8');
-              if (plan.length > 60000) plan = plan.substring(0, 60000) + '\n\n...(truncated)';
+
+              // Check if plan is essentially empty
+              if (plan.trim() === '' || plan === 'No plan generated') {
+                plan = '⚠️ Plan file exists but appears to be empty. Check the "Extract plan" step logs.';
+              } else if (plan.length > 60000) {
+                plan = plan.substring(0, 60000) + '\n\n...(truncated - see artifacts for full plan)';
+              }
+            } else {
+              plan = '❌ Plan file not found. The terraform plan may have failed.';
             }
 
             const status = '${{ steps.validate.outcome }}' === 'success' ? '✅ PASSED' : '❌ FAILED';
@@ -106,12 +179,14 @@ jobs:
 
             **Environment:** ${{ matrix.environment }}
 
-            <details><summary>📋 Plan</summary>
+            <details open><summary>📋 Plan</summary>
 
             \`\`\`terraform
             ${plan}
             \`\`\`
-            </details>`;
+            </details>
+
+            > 💰 **Cost estimate:** Check for Infracost comment below`;
 
             const {data: comments} = await github.rest.issues.listComments({
               owner: context.repo.owner,

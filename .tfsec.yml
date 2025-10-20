@@ -23,11 +23,21 @@ exclude:
   - aws-ec2-require-vpc-flow-logs-for-all-vpcs
   # RDS deletion protection - set at environment level, not module level
   - aws-rds-enable-deletion-protection
-    # VPC Flow Logs requires CreateLogStream with wildcard for dynamic stream names
+
+  # EKS public access - needed for kubectl access from workstations
+  # TODO: Restrict public_access_cidrs to VPN/office IPs in production
+  - aws-eks-no-public-cluster-access
+  - aws-eks-no-public-cluster-access-to-cidr
+
+  # VPC Flow Logs and IAM policy wildcards
+  # VPC Flow Logs requires CreateLogStream with wildcard for dynamic stream names
+  # The wildcard is scoped to a specific log group, not all CloudWatch Logs
   - aws-iam-no-policy-wildcards
 
 severity_overrides:
   aws-elb-alb-not-public: LOW
   aws-ec2-no-public-ip-subnet: LOW
+  aws-eks-no-public-cluster-access: LOW
+  aws-eks-no-public-cluster-access-to-cidr: LOW
 
 minimum_severity: MEDIUM

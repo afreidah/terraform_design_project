@@ -1,0 +1,79 @@
+# examples/rbac/read-only-clusterrole.yaml
+# Apply this after EKS cluster is created
+# kubectl apply -f read-only-clusterrole.yaml
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: view-only
+rules:
+  # Allow viewing most resources
+  - apiGroups: [""]
+    resources:
+      - configmaps
+      - endpoints
+      - persistentvolumeclaims
+      - pods
+      - pods/log
+      - pods/status
+      - replicationcontrollers
+      - replicationcontrollers/scale
+      - serviceaccounts
+      - services
+      - nodes
+      - namespaces
+    verbs: ["get", "list", "watch"]
+
+  # Allow viewing workload resources
+  - apiGroups: ["apps"]
+    resources:
+      - daemonsets
+      - deployments
+      - replicasets
+      - statefulsets
+    verbs: ["get", "list", "watch"]
+
+  # Allow viewing jobs
+  - apiGroups: ["batch"]
+    resources:
+      - jobs
+      - cronjobs
+    verbs: ["get", "list", "watch"]
+
+  # Allow viewing ingress
+  - apiGroups: ["networking.k8s.io"]
+    resources:
+      - ingresses
+      - networkpolicies
+    verbs: ["get", "list", "watch"]
+
+  # Allow viewing RBAC (but not modifying)
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources:
+      - roles
+      - rolebindings
+      - clusterroles
+      - clusterrolebindings
+    verbs: ["get", "list", "watch"]
+
+  # Allow viewing events
+  - apiGroups: [""]
+    resources:
+      - events
+    verbs: ["get", "list", "watch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: view-only-binding
+subjects:
+  # This maps to the 'view-only' group in aws-auth ConfigMap
+  - kind: Group
+    name: view-only
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: ClusterRole
+  name: view-only
+  apiGroup: rbac.authorization.k8s.io

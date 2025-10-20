@@ -54,3 +54,70 @@ variable "kms_key_id" {
   type        = string
   default     = null
 }
+
+# -----------------------------------------------------------------------------
+# EKS VARIABLES (Add these to modules/environment/variables.tf)
+# -----------------------------------------------------------------------------
+
+variable "kubernetes_version" {
+  description = "Kubernetes version for EKS cluster"
+  type        = string
+  default     = "1.31"
+}
+
+variable "eks_public_access_cidrs" {
+  description = "CIDR blocks that can access the EKS public API endpoint"
+  type        = list(string)
+  default     = ["0.0.0.0/0"] # Restrict this in production
+}
+
+variable "eks_aws_auth_roles" {
+  description = "Additional IAM roles to map to Kubernetes RBAC"
+  type = list(object({
+    rolearn  = string
+    username = string
+    groups   = list(string)
+  }))
+  default = []
+}
+
+# -----------------------------------------------------------------------------
+# EKS VARIABLES
+# -----------------------------------------------------------------------------
+
+# Node Group Configuration
+variable "eks_node_instance_types" {
+  description = "Instance types for EKS nodes"
+  type        = list(string)
+  default     = ["t3.medium"]
+}
+
+variable "eks_node_capacity_type" {
+  description = "Capacity type for nodes (ON_DEMAND or SPOT)"
+  type        = string
+  default     = "ON_DEMAND"
+}
+
+variable "eks_node_desired_size" {
+  description = "Desired number of worker nodes"
+  type        = number
+  default     = 2
+}
+
+variable "eks_node_min_size" {
+  description = "Minimum number of worker nodes"
+  type        = number
+  default     = 1
+}
+
+variable "eks_node_max_size" {
+  description = "Maximum number of worker nodes"
+  type        = number
+  default     = 10
+}
+
+variable "eks_node_disk_size" {
+  description = "Disk size in GB for worker nodes"
+  type        = number
+  default     = 50
+}
