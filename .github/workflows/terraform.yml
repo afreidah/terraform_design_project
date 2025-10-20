@@ -53,8 +53,6 @@ jobs:
       matrix:
         environment: [production]
       fail-fast: false
-    env:
-      INFRACOST_API_KEY: ${{ secrets.INFRACOST_API_KEY }}
 
     steps:
       - uses: actions/checkout@v4
@@ -65,21 +63,7 @@ jobs:
       - name: Load image
         run: docker load --input /tmp/${{ env.DOCKER_IMAGE }}.tar
 
-      - name: Setup Infracost
-        uses: infracost/actions/setup@v3
-        with:
-          api-key: ${{ secrets.INFRACOST_API_KEY }}
-
-      - name: Debug - Verify Infracost setup
-        run: |
-          if [ -z "$INFRACOST_API_KEY" ]; then
-            echo "❌ INFRACOST_API_KEY environment variable is NOT set"
-          else
-            echo "✅ INFRACOST_API_KEY is set (length: ${#INFRACOST_API_KEY} characters)"
-          fi
-          infracost --version
-
-      - name: Run validation
+      - name: Run validation and generate plan
         id: validate
         run: |
           docker run --rm \
@@ -87,7 +71,6 @@ jobs:
             -e AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }} \
             -e AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }} \
             -e AWS_REGION=${{ env.AWS_REGION }} \
-            -e INFRACOST_API_KEY=${{ secrets.INFRACOST_API_KEY }} \
             ${{ env.DOCKER_IMAGE }}:${{ github.sha }} \
             make pull_request ENV=${{ matrix.environment }}
         continue-on-error: true
@@ -98,28 +81,40 @@ jobs:
           cd environments/${{ matrix.environment }}
           [ -f tfplan ] && terraform show -no-color tfplan > tfplan.txt || echo "No plan generated" > tfplan.txt
 
-      - name: Generate Infracost JSON
+      - name: Generate Infracost breakdown
         if: always()
         run: |
-          infracost breakdown --path environments/${{ matrix.environment }} \
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace \
+            -w /workspace \
+            -e INFRACOST_API_KEY=${{ secrets.INFRACOST_API_KEY }} \
+            infracost/infracost:latest breakdown \
+            --path environments/${{ matrix.environment }} \
             --format json \
-            --out-file /tmp/infracost-${{ matrix.environment }}.json
+            --out-file /workspace/infracost-${{ matrix.environment }}.json
         continue-on-error: true
 
       - name: Post Infracost comment
-        if: always() && hashFiles('/tmp/infracost-${{ matrix.environment }}.json') != ''
-        uses: infracost/actions/comment@v1
-        with:
-          path: /tmp/infracost-${{ matrix.environment }}.json
-          behavior: update
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        if: always() && hashFiles('infracost-${{ matrix.environment }}.json') != ''
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace \
+            -w /workspace \
+            -e INFRACOST_API_KEY=${{ secrets.INFRACOST_API_KEY }} \
+            -e GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }} \
+            infracost/infracost:latest comment github \
+            --path /workspace/infracost-${{ matrix.environment }}.json \
+            --repo ${{ github.repository }} \
+            --pull-request ${{ github.event.pull_request.number }} \
+            --behavior update
 
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: tfplan-${{ matrix.environment }}
-          path: environments/${{ matrix.environment }}/tfplan*
+          path: |
+            environments/${{ matrix.environment }}/tfplan*
+            infracost-${{ matrix.environment }}.json
           retention-days: 30
 
       - uses: actions/github-script@v7
