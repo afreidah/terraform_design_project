@@ -2,8 +2,10 @@
 # EKS NODE GROUP
 # -----------------------------------------------------------------------------
 
-# Get the latest EKS-optimized AMI
+# Get the latest EKS-optimized AMI (only when ami_id not provided)
 data "aws_ssm_parameter" "eks_ami" {
+  count = var.ami_id == null ? 1 : 0
+
   name = "/aws/service/eks/optimized-ami/${var.cluster_version}/amazon-linux-2/recommended/image_id"
 }
 
@@ -137,8 +139,10 @@ resource "aws_security_group_rule" "node_egress_internet" {
   cidr_blocks       = ["0.0.0.0/0"]
 }
 
-# Allow ALB to reach pods
+# Allow ALB to reach pods (conditional - only when ALB SG provided)
 resource "aws_security_group_rule" "node_ingress_alb" {
+  count = var.alb_security_group_id != "" ? 1 : 0
+
   description              = "Allow ALB to reach pods"
   type                     = "ingress"
   from_port                = 0
@@ -153,7 +157,7 @@ resource "aws_launch_template" "node" {
   name_prefix = "${var.cluster_name}-${var.node_group_name}-"
   description = "Launch template for EKS node group ${var.node_group_name}"
 
-  image_id      = var.ami_id != null ? var.ami_id : data.aws_ssm_parameter.eks_ami.value
+  image_id      = var.ami_id != null ? var.ami_id : one(data.aws_ssm_parameter.eks_ami[*].value)
   instance_type = var.instance_types[0] # Default instance type
 
   vpc_security_group_ids = concat(
