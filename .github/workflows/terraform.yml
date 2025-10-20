@@ -63,26 +63,6 @@ jobs:
       - name: Load image
         run: docker load --input /tmp/${{ env.DOCKER_IMAGE }}.tar
 
-      - name: Debug - Check if secret is accessible
-        run: |
-          if [ -z "${{ secrets.INFRACOST_API_KEY }}" ]; then
-            echo "❌ ERROR: INFRACOST_API_KEY secret is NOT accessible"
-            echo "Please check: Settings → Secrets and variables → Actions"
-            echo "Secret must be named exactly: INFRACOST_API_KEY"
-            exit 1
-          else
-            echo "✅ INFRACOST_API_KEY secret is accessible (length: ${#INFRACOST_KEY} chars)"
-          fi
-        env:
-          INFRACOST_KEY: ${{ secrets.INFRACOST_API_KEY }}
-
-      - name: Debug - Test secret in Docker
-        run: |
-          docker run --rm \
-            -e TEST_KEY=${{ secrets.INFRACOST_API_KEY }} \
-            alpine:latest \
-            sh -c 'if [ -z "$TEST_KEY" ]; then echo "❌ Secret NOT passed to Docker"; exit 1; else echo "✅ Secret passed to Docker (length: ${#TEST_KEY})"; fi'
-
       - name: Run validation and generate plan
         id: validate
         run: |
@@ -99,11 +79,19 @@ jobs:
         if: always()
         run: |
           cd environments/${{ matrix.environment }}
-          [ -f tfplan ] && terraform show -no-color tfplan > tfplan.txt || echo "No plan generated" > tfplan.txt
+          if [ -f tfplan ]; then
+            echo "✅ Plan file found, converting to text..."
+            terraform show -no-color tfplan > tfplan.txt
+            echo "Plan size: $(wc -l < tfplan.txt) lines"
+          else
+            echo "❌ No plan file found"
+            echo "No plan generated" > tfplan.txt
+          fi
 
       - name: Generate Infracost breakdown
         if: always()
         run: |
+          echo "🔍 Generating Infracost breakdown..."
           docker run --rm \
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
@@ -112,11 +100,18 @@ jobs:
             --path environments/${{ matrix.environment }} \
             --format json \
             --out-file /workspace/infracost-${{ matrix.environment }}.json
-        continue-on-error: true
+
+          if [ -f infracost-${{ matrix.environment }}.json ]; then
+            echo "✅ Infracost JSON generated successfully"
+            echo "File size: $(wc -c < infracost-${{ matrix.environment }}.json) bytes"
+          else
+            echo "❌ Infracost JSON file not created"
+          fi
 
       - name: Post Infracost comment
         if: always() && hashFiles('infracost-${{ matrix.environment }}.json') != ''
         run: |
+          echo "💬 Posting Infracost comment to PR..."
           docker run --rm \
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
@@ -127,6 +122,7 @@ jobs:
             --pull-request ${{ github.event.pull_request.number }} \
             --github-token ${{ secrets.GITHUB_TOKEN }} \
             --behavior update
+          echo "✅ Infracost comment posted"
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -147,7 +143,15 @@ jobs:
 
             if (fs.existsSync(planPath)) {
               plan = fs.readFileSync(planPath, 'utf8');
-              if (plan.length > 60000) plan = plan.substring(0, 60000) + '\n\n...(truncated)';
+
+              // Check if plan is essentially empty
+              if (plan.trim() === '' || plan === 'No plan generated') {
+                plan = '⚠️ Plan file exists but appears to be empty. Check the "Extract plan" step logs.';
+              } else if (plan.length > 60000) {
+                plan = plan.substring(0, 60000) + '\n\n...(truncated - see artifacts for full plan)';
+              }
+            } else {
+              plan = '❌ Plan file not found. The terraform plan may have failed.';
             }
 
             const status = '${{ steps.validate.outcome }}' === 'success' ? '✅ PASSED' : '❌ FAILED';
@@ -155,12 +159,14 @@ jobs:
 
             **Environment:** ${{ matrix.environment }}
 
-            <details><summary>📋 Plan</summary>
+            <details open><summary>📋 Plan</summary>
 
             \`\`\`terraform
             ${plan}
             \`\`\`
-            </details>`;
+            </details>
+
+            > 💰 **Cost estimate:** Check for Infracost comment below`;
 
             const {data: comments} = await github.rest.issues.listComments({
               owner: context.repo.owner,
