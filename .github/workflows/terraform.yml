@@ -79,34 +79,51 @@ jobs:
         if: always()
         run: |
           if [ -f environments/${{ matrix.environment }}/tfplan ]; then
-            echo "✅ Plan file found, converting to text..."
+            echo "✅ Plan file found, converting to text and JSON..."
+            # Convert to text for PR comment
             docker run --rm \
               -v ${{ github.workspace }}:/workspace \
               -w /workspace/environments/${{ matrix.environment }} \
               ${{ env.DOCKER_IMAGE }}:${{ github.sha }} \
               terraform show -no-color tfplan > environments/${{ matrix.environment }}/tfplan.txt
-            echo "Plan size: $(wc -l < environments/${{ matrix.environment }}/tfplan.txt) lines"
+            echo "Text plan size: $(wc -l < environments/${{ matrix.environment }}/tfplan.txt) lines"
+
+            # Convert to JSON for Infracost
+            docker run --rm \
+              -v ${{ github.workspace }}:/workspace \
+              -w /workspace/environments/${{ matrix.environment }} \
+              ${{ env.DOCKER_IMAGE }}:${{ github.sha }} \
+              terraform show -json tfplan > environments/${{ matrix.environment }}/tfplan.json
+            echo "JSON plan size: $(wc -c < environments/${{ matrix.environment }}/tfplan.json) bytes"
           else
             echo "❌ No plan file found"
             echo "No plan generated" > environments/${{ matrix.environment }}/tfplan.txt
           fi
 
       - name: Generate Infracost breakdown
-        if: always()
+        if: always() && hashFiles('environments/${{ matrix.environment }}/tfplan.json') != ''
         run: |
-          echo "🔍 Generating Infracost breakdown..."
+          echo "🔍 Generating Infracost breakdown from plan..."
           docker run --rm \
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
             -e INFRACOST_API_KEY=${{ secrets.INFRACOST_API_KEY }} \
             infracost/infracost:latest breakdown \
-            --path environments/${{ matrix.environment }} \
+            --path environments/${{ matrix.environment }}/tfplan.json \
             --format json \
             --out-file /workspace/infracost-${{ matrix.environment }}.json
 
           if [ -f infracost-${{ matrix.environment }}.json ]; then
             echo "✅ Infracost JSON generated successfully"
             echo "File size: $(wc -c < infracost-${{ matrix.environment }}.json) bytes"
+            echo ""
+            echo "Preview of cost estimate:"
+            docker run --rm \
+              -v ${{ github.workspace }}:/workspace \
+              -w /workspace \
+              infracost/infracost:latest output \
+              --path infracost-${{ matrix.environment }}.json \
+              --format table
           else
             echo "❌ Infracost JSON file not created"
           fi
