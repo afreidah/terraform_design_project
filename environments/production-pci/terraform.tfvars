@@ -1,9 +1,9 @@
 # Environment Configuration
 region      = "us-east-1"
-environment = "dev"
+environment = "production-pci"
 
-# VPC Configuration
-vpc_cidr = "10.0.0.0/16"
+# VPC Configuration - Different CIDR to avoid conflicts with production
+vpc_cidr = "10.21.0.0/16"
 
 availability_zones = [
   "us-east-1a",
@@ -13,23 +13,23 @@ availability_zones = [
 
 # Public subnets
 public_subnet_cidrs = [
-  "10.0.1.0/24",
-  "10.0.2.0/24",
-  "10.0.3.0/24"
+  "10.21.1.0/24",
+  "10.21.2.0/24",
+  "10.21.3.0/24"
 ]
 
 # Private app subnets
 private_app_subnet_cidrs = [
-  "10.0.11.0/24",
-  "10.0.12.0/24",
-  "10.0.13.0/24"
+  "10.21.11.0/24",
+  "10.21.12.0/24",
+  "10.21.13.0/24"
 ]
 
-# Private data subnets
+# Private data subnets (won't be used, but required by module)
 private_data_subnet_cidrs = [
-  "10.0.21.0/24",
-  "10.0.22.0/24",
-  "10.0.23.0/24"
+  "10.21.21.0/24",
+  "10.21.22.0/24",
+  "10.21.23.0/24"
 ]
 
 # EC2 Configuration

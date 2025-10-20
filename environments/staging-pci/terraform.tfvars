@@ -1,9 +1,9 @@
 # Environment Configuration
 region      = "us-east-1"
-environment = "dev"
+environment = "staging-pci"
 
-# VPC Configuration
-vpc_cidr = "10.0.0.0/16"
+# VPC Configuration - Different CIDR to avoid conflicts with staging
+vpc_cidr = "10.11.0.0/16"
 
 availability_zones = [
   "us-east-1a",
@@ -13,23 +13,23 @@ availability_zones = [
 
 # Public subnets
 public_subnet_cidrs = [
-  "10.0.1.0/24",
-  "10.0.2.0/24",
-  "10.0.3.0/24"
+  "10.11.1.0/24",
+  "10.11.2.0/24",
+  "10.11.3.0/24"
 ]
 
 # Private app subnets
 private_app_subnet_cidrs = [
-  "10.0.11.0/24",
-  "10.0.12.0/24",
-  "10.0.13.0/24"
+  "10.11.11.0/24",
+  "10.11.12.0/24",
+  "10.11.13.0/24"
 ]
 
-# Private data subnets
+# Private data subnets (won't be used, but required by module)
 private_data_subnet_cidrs = [
-  "10.0.21.0/24",
-  "10.0.22.0/24",
-  "10.0.23.0/24"
+  "10.11.21.0/24",
+  "10.11.22.0/24",
+  "10.11.23.0/24"
 ]
 
 # EC2 Configuration
