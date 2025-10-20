@@ -68,6 +68,17 @@ jobs:
         with:
           api-key: ${{ secrets.INFRACOST_API_KEY }}
 
+      - name: Debug - Verify Infracost setup
+        run: |
+          if [ -z "$INFRACOST_API_KEY" ]; then
+            echo "❌ INFRACOST_API_KEY environment variable is NOT set"
+          else
+            echo "✅ INFRACOST_API_KEY is set (length: ${#INFRACOST_API_KEY} characters)"
+          fi
+          infracost --version
+        env:
+          INFRACOST_API_KEY: ${{ secrets.INFRACOST_API_KEY }}
+
       - name: Run validation
         id: validate
         run: |
@@ -95,15 +106,17 @@ jobs:
           infracost breakdown --path environments/${{ matrix.environment }} \
             --format json \
             --out-file /tmp/infracost-${{ matrix.environment }}.json
+        continue-on-error: true
 
       - name: Post Infracost comment
-        if: always()
-        env:
-          INFRACOST_API_KEY: ${{ secrets.INFRACOST_API_KEY }}
+        if: always() && hashFiles('/tmp/infracost-${{ matrix.environment }}.json') != ''
         uses: infracost/actions/comment@v1
         with:
           path: /tmp/infracost-${{ matrix.environment }}.json
           behavior: update
+        env:
+          INFRACOST_API_KEY: ${{ secrets.INFRACOST_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: actions/upload-artifact@v4
         if: always()
