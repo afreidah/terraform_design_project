@@ -24,8 +24,11 @@ on:
         type: choice
         options:
           - dev
+          - dev-pci
           - staging
+          - staging-pci
           - production
+          - production-pci
       action:
         description: 'Terraform action'
         required: true
@@ -69,7 +72,7 @@ jobs:
       pull-requests: write
     strategy:
       matrix:
-        environment: [dev, staging, production]
+        environment: [dev, dev-pci, staging, staging-pci, production, production-pci]
       fail-fast: false
 
     steps:
@@ -128,18 +131,26 @@ jobs:
 
       - name: Post Infracost comment
         if: always() && hashFiles('infracost-${{ matrix.environment }}.json') != ''
-        run: |
-          docker run --rm \
-            -v ${{ github.workspace }}:/workspace \
-            -w /workspace \
-            -e INFRACOST_API_KEY=${{ secrets.INFRACOST_API_KEY }} \
-            infracost/infracost:latest comment github \
-            --path /workspace/infracost-${{ matrix.environment }}.json \
-            --repo ${{ github.repository }} \
-            --pull-request ${{ github.event.pull_request.number }} \
-            --github-token ${{ secrets.GITHUB_TOKEN }} \
-            --tag ${{ matrix.environment }} \
-            --behavior update
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const { execSync } = require('child_process');
+
+            // Format the Infracost output
+            const infracostTable = execSync(
+              'docker run --rm -v ${{ github.workspace }}:/workspace infracost/infracost:latest output --path /workspace/infracost-${{ matrix.environment }}.json --format github-comment',
+              { encoding: 'utf8' }
+            );
+
+            const body = `## 💰 Infracost Report - **${{ matrix.environment }}**\n\n${infracostTable}`;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body
+            });
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -174,7 +185,7 @@ jobs:
 
             **Environment:** ${{ matrix.environment }}
 
-            <details open><summary>📋 Plan</summary>
+            <details><summary>📋 Plan</summary>
 
             \`\`\`terraform
             ${plan}
@@ -272,7 +283,7 @@ jobs:
     if: github.event_name == 'push'
     strategy:
       matrix:
-        environment: [dev, staging, production]
+        environment: [dev, dev-pci, staging, staging-pci, production, production-pci]
 
     steps:
       - uses: actions/checkout@v4
