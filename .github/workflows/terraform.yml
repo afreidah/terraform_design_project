@@ -78,14 +78,17 @@ jobs:
       - name: Extract plan
         if: always()
         run: |
-          cd environments/${{ matrix.environment }}
-          if [ -f tfplan ]; then
+          if [ -f environments/${{ matrix.environment }}/tfplan ]; then
             echo "✅ Plan file found, converting to text..."
-            terraform show -no-color tfplan > tfplan.txt
-            echo "Plan size: $(wc -l < tfplan.txt) lines"
+            docker run --rm \
+              -v ${{ github.workspace }}:/workspace \
+              -w /workspace/environments/${{ matrix.environment }} \
+              ${{ env.DOCKER_IMAGE }}:${{ github.sha }} \
+              terraform show -no-color tfplan > environments/${{ matrix.environment }}/tfplan.txt
+            echo "Plan size: $(wc -l < environments/${{ matrix.environment }}/tfplan.txt) lines"
           else
             echo "❌ No plan file found"
-            echo "No plan generated" > tfplan.txt
+            echo "No plan generated" > environments/${{ matrix.environment }}/tfplan.txt
           fi
 
       - name: Generate Infracost breakdown
