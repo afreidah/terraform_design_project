@@ -8,7 +8,7 @@
 
 # Global variables - defaults for all tests
 variables {
-  # Required module variables (must have defaults)
+  # Required module variables
   cluster_id         = "test-redis"
   subnet_ids         = ["subnet-11111111", "subnet-22222222", "subnet-33333333"]
   security_group_ids = ["sg-redis12345"]
