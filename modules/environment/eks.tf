@@ -39,7 +39,8 @@ module "eks_cluster" {
   cloudwatch_retention_days = 90
   cloudwatch_kms_key_id     = module.kms_cloudwatch_logs.key_arn
 
-  # Don't reference node security group (circular dependency)
+  # Pass node security group after it's created - removed to avoid circular dependency
+  # Security group rules are managed separately below
   node_security_group_id = null
 
   # Don't manage aws-auth here (we'll do it after node group)
@@ -105,6 +106,11 @@ resource "aws_security_group_rule" "cluster_ingress_nodes" {
   protocol                 = "tcp"
   security_group_id        = module.eks_cluster.cluster_security_group_id
   source_security_group_id = module.eks_node_group.security_group_id
+
+  depends_on = [
+    module.eks_cluster,
+    module.eks_node_group
+  ]
 }
 
 # Update aws-auth ConfigMap to allow nodes to join

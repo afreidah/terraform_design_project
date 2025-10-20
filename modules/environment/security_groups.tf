@@ -123,6 +123,13 @@ module "security_groups" {
           cidr_blocks = [var.vpc_cidr]
         },
         {
+          description = "Allow SSH from DevOps IPs only"
+          from_port   = 22
+          to_port     = 22
+          protocol    = "tcp"
+          cidr_blocks = var.devops_ip_ranges
+        },
+        {
           description = "Allow Kafka access"
           from_port   = 9092
           to_port     = 9092

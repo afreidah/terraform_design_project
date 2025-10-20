@@ -2,7 +2,7 @@ name: Terraform CI/CD
 
 on:
   pull_request:
-    branches: [main, master]
+    branches: [main]
     paths:
       - 'environments/**'
       - 'modules/**'
@@ -11,10 +11,28 @@ on:
       - 'Makefile'
 
   push:
-    branches: [main, master]
+    branches: [main]
     paths:
       - 'environments/**'
       - 'modules/**'
+
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - production
+      action:
+        description: 'Terraform action'
+        required: true
+        type: choice
+        options:
+          - plan
+          - apply
 
 env:
   AWS_REGION: 'us-east-1'
@@ -51,7 +69,7 @@ jobs:
       pull-requests: write
     strategy:
       matrix:
-        environment: [production]
+        environment: [dev, staging, production]
       fail-fast: false
 
     steps:
@@ -80,21 +98,17 @@ jobs:
         run: |
           if [ -f environments/${{ matrix.environment }}/tfplan ]; then
             echo "✅ Plan file found, converting to text and JSON..."
-            # Convert to text for PR comment
             docker run --rm \
               -v ${{ github.workspace }}:/workspace \
               -w /workspace/environments/${{ matrix.environment }} \
               ${{ env.DOCKER_IMAGE }}:${{ github.sha }} \
               terraform show -no-color tfplan > environments/${{ matrix.environment }}/tfplan.txt
-            echo "Text plan size: $(wc -l < environments/${{ matrix.environment }}/tfplan.txt) lines"
 
-            # Convert to JSON for Infracost
             docker run --rm \
               -v ${{ github.workspace }}:/workspace \
               -w /workspace/environments/${{ matrix.environment }} \
               ${{ env.DOCKER_IMAGE }}:${{ github.sha }} \
               terraform show -json tfplan > environments/${{ matrix.environment }}/tfplan.json
-            echo "JSON plan size: $(wc -c < environments/${{ matrix.environment }}/tfplan.json) bytes"
           else
             echo "❌ No plan file found"
             echo "No plan generated" > environments/${{ matrix.environment }}/tfplan.txt
@@ -103,7 +117,6 @@ jobs:
       - name: Generate Infracost breakdown
         if: always() && hashFiles('environments/${{ matrix.environment }}/tfplan.json') != ''
         run: |
-          echo "🔍 Generating Infracost breakdown from plan..."
           docker run --rm \
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
@@ -113,25 +126,9 @@ jobs:
             --format json \
             --out-file /workspace/infracost-${{ matrix.environment }}.json
 
-          if [ -f infracost-${{ matrix.environment }}.json ]; then
-            echo "✅ Infracost JSON generated successfully"
-            echo "File size: $(wc -c < infracost-${{ matrix.environment }}.json) bytes"
-            echo ""
-            echo "Preview of cost estimate:"
-            docker run --rm \
-              -v ${{ github.workspace }}:/workspace \
-              -w /workspace \
-              infracost/infracost:latest output \
-              --path infracost-${{ matrix.environment }}.json \
-              --format table
-          else
-            echo "❌ Infracost JSON file not created"
-          fi
-
       - name: Post Infracost comment
         if: always() && hashFiles('infracost-${{ matrix.environment }}.json') != ''
         run: |
-          echo "💬 Posting Infracost comment to PR..."
           docker run --rm \
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
@@ -141,8 +138,8 @@ jobs:
             --repo ${{ github.repository }} \
             --pull-request ${{ github.event.pull_request.number }} \
             --github-token ${{ secrets.GITHUB_TOKEN }} \
+            --tag ${{ matrix.environment }} \
             --behavior update
-          echo "✅ Infracost comment posted"
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -163,15 +160,13 @@ jobs:
 
             if (fs.existsSync(planPath)) {
               plan = fs.readFileSync(planPath, 'utf8');
-
-              // Check if plan is essentially empty
               if (plan.trim() === '' || plan === 'No plan generated') {
-                plan = '⚠️ Plan file exists but appears to be empty. Check the "Extract plan" step logs.';
+                plan = '⚠️ Plan file exists but appears to be empty.';
               } else if (plan.length > 60000) {
-                plan = plan.substring(0, 60000) + '\n\n...(truncated - see artifacts for full plan)';
+                plan = plan.substring(0, 60000) + '\n\n...(truncated)';
               }
             } else {
-              plan = '❌ Plan file not found. The terraform plan may have failed.';
+              plan = '❌ Plan file not found.';
             }
 
             const status = '${{ steps.validate.outcome }}' === 'success' ? '✅ PASSED' : '❌ FAILED';
@@ -215,14 +210,69 @@ jobs:
       - if: steps.validate.outcome != 'success'
         run: exit 1
 
+  manual-deploy:
+    name: Deploy - ${{ github.event.inputs.environment }}
+    runs-on: ubuntu-latest
+    needs: build-image
+    if: github.event_name == 'workflow_dispatch'
+    environment: ${{ github.event.inputs.environment }}
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: docker-image
+          path: /tmp
+      - run: docker load --input /tmp/${{ env.DOCKER_IMAGE }}.tar
+
+      - name: Terraform Init
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace \
+            -e AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }} \
+            -e AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }} \
+            -e AWS_REGION=${{ env.AWS_REGION }} \
+            ${{ env.DOCKER_IMAGE }}:${{ github.sha }} \
+            bash -c "cd /workspace/environments/${{ github.event.inputs.environment }} && terraform init"
+
+      - name: Terraform Plan
+        if: github.event.inputs.action == 'plan'
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace \
+            -e AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }} \
+            -e AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }} \
+            -e AWS_REGION=${{ env.AWS_REGION }} \
+            ${{ env.DOCKER_IMAGE }}:${{ github.sha }} \
+            bash -c "cd /workspace/environments/${{ github.event.inputs.environment }} && terraform plan -out=tfplan"
+
+      - name: Terraform Apply
+        if: github.event.inputs.action == 'apply'
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace \
+            -e AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }} \
+            -e AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }} \
+            -e AWS_REGION=${{ env.AWS_REGION }} \
+            ${{ env.DOCKER_IMAGE }}:${{ github.sha }} \
+            bash -c "cd /workspace/environments/${{ github.event.inputs.environment }} && terraform init && terraform apply -auto-approve"
+
+      - name: Upload plan artifact
+        if: github.event.inputs.action == 'plan'
+        uses: actions/upload-artifact@v4
+        with:
+          name: manual-plan-${{ github.event.inputs.environment }}-${{ github.run_number }}
+          path: environments/${{ github.event.inputs.environment }}/tfplan*
+          retention-days: 30
+
   merge-validation:
-    name: Merge - ${{ matrix.environment }}
+    name: Validate on Merge
     runs-on: ubuntu-latest
     needs: build-image
     if: github.event_name == 'push'
     strategy:
       matrix:
-        environment: [production]
+        environment: [dev, staging, production]
 
     steps:
       - uses: actions/checkout@v4

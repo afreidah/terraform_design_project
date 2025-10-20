@@ -91,7 +91,7 @@ resource "aws_opensearch_domain" "this" {
   dynamic "log_publishing_options" {
     for_each = var.enable_audit_logs ? [1] : []
     content {
-      cloudwatch_log_group_arn = aws_cloudwatch_log_group.audit_logs[0].arn
+      cloudwatch_log_group_arn = one(values(aws_cloudwatch_log_group.audit_logs)[*].arn)
       log_type                 = "AUDIT_LOGS"
       enabled                  = true
     }
@@ -136,7 +136,7 @@ resource "aws_cloudwatch_log_group" "es_application_logs" {
 
 # CloudWatch Log Group - Audit Logs
 resource "aws_cloudwatch_log_group" "audit_logs" {
-  count = var.enable_audit_logs ? 1 : 0
+  for_each = var.enable_audit_logs ? toset(["enabled"]) : toset([])
 
   name              = "/aws/opensearch/${var.domain_name}/audit-logs"
   retention_in_days = var.cloudwatch_retention_days

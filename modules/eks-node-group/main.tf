@@ -45,7 +45,7 @@ resource "aws_iam_role_policy_attachment" "node_AmazonEC2ContainerRegistryReadOn
 
 # SSM access for admin (if enabled)
 resource "aws_iam_role_policy_attachment" "node_AmazonSSMManagedInstanceCore" {
-  count = var.enable_ssm_access ? 1 : 0
+  for_each = var.enable_ssm_access ? toset(["enabled"]) : toset([])
 
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
   role       = aws_iam_role.node.name
@@ -53,7 +53,7 @@ resource "aws_iam_role_policy_attachment" "node_AmazonSSMManagedInstanceCore" {
 
 # CloudWatch agent (if enabled)
 resource "aws_iam_role_policy_attachment" "node_CloudWatchAgentServerPolicy" {
-  count = var.enable_cloudwatch_agent ? 1 : 0
+  for_each = var.enable_cloudwatch_agent ? toset(["enabled"]) : toset([])
 
   policy_arn = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
   role       = aws_iam_role.node.name
