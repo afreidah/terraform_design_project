@@ -13,4 +13,6 @@ module "infrastructure" {
   ec2_ami_id                = var.ec2_ami_id
   ec2_instance_type         = var.ec2_instance_type
   kms_key_id                = var.kms_key_id
+  ssl_certificate_arn       = var.ssl_certificate_arn
+  eks_public_access_cidrs   = var.eks_public_access_cidrs
 }
