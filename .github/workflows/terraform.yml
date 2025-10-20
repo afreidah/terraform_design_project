@@ -53,6 +53,8 @@ jobs:
       matrix:
         environment: [production]
       fail-fast: false
+    env:
+      INFRACOST_API_KEY: ${{ secrets.INFRACOST_API_KEY }}
 
     steps:
       - uses: actions/checkout@v4
@@ -76,8 +78,6 @@ jobs:
             echo "✅ INFRACOST_API_KEY is set (length: ${#INFRACOST_API_KEY} characters)"
           fi
           infracost --version
-        env:
-          INFRACOST_API_KEY: ${{ secrets.INFRACOST_API_KEY }}
 
       - name: Run validation
         id: validate
@@ -100,8 +100,6 @@ jobs:
 
       - name: Generate Infracost JSON
         if: always()
-        env:
-          INFRACOST_API_KEY: ${{ secrets.INFRACOST_API_KEY }}
         run: |
           infracost breakdown --path environments/${{ matrix.environment }} \
             --format json \
@@ -115,7 +113,6 @@ jobs:
           path: /tmp/infracost-${{ matrix.environment }}.json
           behavior: update
         env:
-          INFRACOST_API_KEY: ${{ secrets.INFRACOST_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: actions/upload-artifact@v4
