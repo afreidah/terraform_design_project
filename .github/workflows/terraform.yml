@@ -135,11 +135,10 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            const infracostJson = JSON.parse(fs.readFileSync('infracost-${{ matrix.environment }}.json', 'utf8'));
+            const { execSync } = require('child_process');
 
             // Format the Infracost output
-            const exec = require('child_process').execSync;
-            const infracostTable = exec(
+            const infracostTable = execSync(
               'docker run --rm -v ${{ github.workspace }}:/workspace infracost/infracost:latest output --path /workspace/infracost-${{ matrix.environment }}.json --format github-comment',
               { encoding: 'utf8' }
             );
