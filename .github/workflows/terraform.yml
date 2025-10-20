@@ -24,8 +24,11 @@ on:
         type: choice
         options:
           - dev
+          - dev-pci
           - staging
+          - staging-pci
           - production
+          - production-pci
       action:
         description: 'Terraform action'
         required: true
@@ -69,7 +72,7 @@ jobs:
       pull-requests: write
     strategy:
       matrix:
-        environment: [dev, staging, production]
+        environment: [dev, dev-pci, staging, staging-pci, production, production-pci]
       fail-fast: false
 
     steps:
@@ -138,8 +141,7 @@ jobs:
             --repo ${{ github.repository }} \
             --pull-request ${{ github.event.pull_request.number }} \
             --github-token ${{ secrets.GITHUB_TOKEN }} \
-            --tag ${{ matrix.environment }} \
-            --behavior update
+            --behavior new
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -174,7 +176,7 @@ jobs:
 
             **Environment:** ${{ matrix.environment }}
 
-            <details open><summary>📋 Plan</summary>
+            <details><summary>📋 Plan</summary>
 
             \`\`\`terraform
             ${plan}
@@ -272,7 +274,7 @@ jobs:
     if: github.event_name == 'push'
     strategy:
       matrix:
-        environment: [dev, staging, production]
+        environment: [dev, dev-pci, staging, staging-pci, production, production-pci]
 
     steps:
       - uses: actions/checkout@v4
