@@ -1,3 +1,24 @@
+# -----------------------------------------------------------------------------
+# ALB MODULE - INPUT VARIABLES
+# -----------------------------------------------------------------------------
+#
+# This file defines all configurable parameters for the Application Load
+# Balancer module, including ALB configuration, target group settings,
+# listener options, and security features.
+#
+# Variable Categories:
+#   - Core Configuration: Name, VPC, networking, and internal/external setting
+#   - Security: Security groups, header filtering, certificate
+#   - Performance: HTTP/2, cross-zone load balancing, timeouts
+#   - Target Groups: Backend configuration with health checks and stickiness
+#   - Logging: Access logs configuration
+#   - Protection: Deletion protection, WAF integration
+# -----------------------------------------------------------------------------
+
+# -----------------------------------------------------------------------------
+# CORE CONFIGURATION
+# -----------------------------------------------------------------------------
+
 variable "name" {
   description = "Name of the ALB"
   type        = string
@@ -19,16 +40,36 @@ variable "subnet_ids" {
   type        = list(string)
 }
 
+# -----------------------------------------------------------------------------
+# SECURITY CONFIGURATION
+# -----------------------------------------------------------------------------
+
 variable "security_group_ids" {
   description = "List of security group IDs for the ALB"
   type        = list(string)
 }
 
-variable "enable_deletion_protection" {
-  description = "Enable deletion protection on the ALB"
+variable "drop_invalid_header_fields" {
+  description = "Drop invalid HTTP header fields"
   type        = bool
-  default     = false
+  default     = true
 }
+
+variable "certificate_arn" {
+  description = "ARN of SSL certificate for HTTPS listener"
+  type        = string
+  default     = null
+}
+
+variable "waf_web_acl_arn" {
+  description = "ARN of the WAF WebACL to associate with the ALB"
+  type        = string
+  default     = null
+}
+
+# -----------------------------------------------------------------------------
+# PERFORMANCE & AVAILABILITY
+# -----------------------------------------------------------------------------
 
 variable "enable_http2" {
   description = "Enable HTTP/2 on the ALB"
@@ -48,11 +89,19 @@ variable "idle_timeout" {
   default     = 60
 }
 
-variable "drop_invalid_header_fields" {
-  description = "Drop invalid HTTP header fields"
+# -----------------------------------------------------------------------------
+# PROTECTION & LIFECYCLE
+# -----------------------------------------------------------------------------
+
+variable "enable_deletion_protection" {
+  description = "Enable deletion protection on the ALB"
   type        = bool
-  default     = true
+  default     = false
 }
+
+# -----------------------------------------------------------------------------
+# ACCESS LOGGING
+# -----------------------------------------------------------------------------
 
 variable "access_logs_enabled" {
   description = "Enable ALB access logging"
@@ -66,18 +115,12 @@ variable "access_logs_bucket" {
   default     = null
 }
 
-variable "certificate_arn" {
-  description = "ARN of SSL certificate for HTTPS listener"
-  type        = string
-  default     = null
-}
+# -----------------------------------------------------------------------------
+# TARGET GROUPS
+# -----------------------------------------------------------------------------
 
-variable "waf_web_acl_arn" {
-  description = "ARN of the WAF WebACL to associate with the ALB"
-  type        = string
-  default     = null
-}
-
+# Target group configuration with health checks and stickiness
+# Supports multiple target groups with independent configurations
 variable "target_groups" {
   description = "Map of target group configurations"
   type = map(object({
@@ -104,6 +147,10 @@ variable "target_groups" {
   }))
   default = {}
 }
+
+# -----------------------------------------------------------------------------
+# TAGGING
+# -----------------------------------------------------------------------------
 
 variable "tags" {
   description = "Tags to apply to resources"

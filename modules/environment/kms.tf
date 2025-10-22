@@ -1,6 +1,36 @@
-# KMS Keys for encryption
+# -----------------------------------------------------------------------------
+# KMS ENCRYPTION KEYS
+# -----------------------------------------------------------------------------
+#
+# This file defines KMS Customer Managed Keys (CMKs) for encrypting data at rest
+# across multiple AWS services. Separate keys provide:
+#   - Security isolation between services
+#   - Granular access control per service
+#   - Independent key rotation schedules
+#   - Audit trail per service via CloudTrail
+#
+# Keys Defined:
+#   - Parameter Store: Encrypts SecureString parameters (secrets, passwords)
+#   - CloudWatch Logs: Encrypts log data (requires special policy for logs service)
+#   - RDS: Encrypts database storage and automated backups
+#   - ElastiCache: Encrypts Redis data at rest
+#   - OpenSearch: Encrypts search indices and snapshots
+#   - MSK: Encrypts Kafka data at rest
+#   - EKS: Encrypts Kubernetes secrets at rest
+#
+# Security Features:
+#   - Automatic key rotation: Enabled by default (yearly)
+#   - Access control: IAM policies control key usage
+#   - Audit logging: All key operations logged to CloudTrail
+#   - Regional: Keys are regional and don't leave AWS region
+# -----------------------------------------------------------------------------
 
-# KMS key for Parameter Store
+# -----------------------------------------------------------------------------
+# PARAMETER STORE ENCRYPTION KEY
+# -----------------------------------------------------------------------------
+
+# Encrypts sensitive configuration stored in AWS Systems Manager Parameter Store
+# Used for: database passwords, API keys, Redis tokens, application secrets
 module "kms_parameter_store" {
   source = "../../modules/kms"
 
@@ -16,16 +46,27 @@ module "kms_parameter_store" {
   )
 }
 
-# KMS key for CloudWatch Logs
+# -----------------------------------------------------------------------------
+# CLOUDWATCH LOGS ENCRYPTION KEY
+# -----------------------------------------------------------------------------
+
+# Encrypts CloudWatch Logs from EKS, VPC Flow Logs, and other services
+# IMPORTANT: Requires custom policy to allow CloudWatch Logs service access
 module "kms_cloudwatch_logs" {
   source = "../../modules/kms"
 
   description = "KMS key for CloudWatch Logs encryption"
   alias_name  = "${var.environment}-cloudwatch-logs"
 
+  # -------------------------------------------------------------------------
+  # CUSTOM KEY POLICY
+  # -------------------------------------------------------------------------
+  # CloudWatch Logs requires explicit permission to use KMS keys
+  # Standard key policy (root account access) + CloudWatch Logs service access
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
+      # Root account full access (required for key management)
       {
         Sid    = "Enable IAM User Permissions"
         Effect = "Allow"
@@ -35,6 +76,7 @@ module "kms_cloudwatch_logs" {
         Action   = "kms:*"
         Resource = "*"
       },
+      # CloudWatch Logs service access
       {
         Sid    = "Allow CloudWatch Logs"
         Effect = "Allow"
@@ -50,6 +92,7 @@ module "kms_cloudwatch_logs" {
           "kms:DescribeKey"
         ]
         Resource = "*"
+        # Condition restricts to logs in this account/region only
         Condition = {
           ArnLike = {
             "kms:EncryptionContext:aws:logs:arn" = "arn:aws:logs:${var.region}:${data.aws_caller_identity.current.account_id}:*"
@@ -68,7 +111,12 @@ module "kms_cloudwatch_logs" {
   )
 }
 
-# KMS key for RDS
+# -----------------------------------------------------------------------------
+# DATA TIER ENCRYPTION KEYS
+# -----------------------------------------------------------------------------
+
+# RDS Database Encryption Key
+# Encrypts: DB storage, automated backups, read replicas, snapshots
 module "kms_rds" {
   source = "../../modules/kms"
 
@@ -84,7 +132,8 @@ module "kms_rds" {
   )
 }
 
-# KMS key for ElastiCache
+# ElastiCache Redis Encryption Key
+# Encrypts: Redis data at rest, backups
 module "kms_elasticache" {
   source = "../../modules/kms"
 
@@ -100,7 +149,8 @@ module "kms_elasticache" {
   )
 }
 
-# KMS key for OpenSearch
+# OpenSearch Encryption Key
+# Encrypts: Indices, snapshots, automated backups
 module "kms_opensearch" {
   source = "../../modules/kms"
 
@@ -116,7 +166,8 @@ module "kms_opensearch" {
   )
 }
 
-# KMS key for MSK
+# MSK Kafka Encryption Key
+# Encrypts: Kafka data at rest, log segments
 module "kms_msk" {
   source = "../../modules/kms"
 
@@ -132,7 +183,10 @@ module "kms_msk" {
   )
 }
 
-# Outputs
+# -----------------------------------------------------------------------------
+# OUTPUTS
+# -----------------------------------------------------------------------------
+
 output "kms_parameter_store_key_id" {
   description = "KMS key ID for Parameter Store"
   value       = module.kms_parameter_store.key_id

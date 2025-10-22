@@ -1,4 +1,14 @@
-# environments/production/variables.tf
+# -----------------------------------------------------------------------------
+# INPUT VARIABLES
+# -----------------------------------------------------------------------------
+#
+# This file defines all input variables for the environment configuration.
+# Variables are organized by functional area for easy navigation.
+# -----------------------------------------------------------------------------
+
+# -----------------------------------------------------------------------------
+# ENVIRONMENT & REGION
+# -----------------------------------------------------------------------------
 
 variable "region" {
   description = "AWS region"
@@ -10,7 +20,10 @@ variable "environment" {
   type        = string
 }
 
-# VPC Configuration
+# -----------------------------------------------------------------------------
+# VPC & NETWORKING CONFIGURATION
+# -----------------------------------------------------------------------------
+
 variable "vpc_cidr" {
   description = "VPC CIDR block"
   type        = string
@@ -36,7 +49,10 @@ variable "private_data_subnet_cidrs" {
   type        = list(string)
 }
 
-# EC2 Configuration
+# -----------------------------------------------------------------------------
+# EC2 CONFIGURATION
+# -----------------------------------------------------------------------------
+
 variable "ec2_ami_id" {
   description = "AMI ID for EC2 instances (if not specified, latest Amazon Linux 2 will be used)"
   type        = string
@@ -49,7 +65,10 @@ variable "ec2_instance_type" {
   default     = "t3.medium"
 }
 
-# Optional: KMS Key for encryption
+# -----------------------------------------------------------------------------
+# SECURITY & ENCRYPTION
+# -----------------------------------------------------------------------------
+
 variable "kms_key_id" {
   description = "KMS key ID for encryption (RDS, Performance Insights, etc.)"
   type        = string
@@ -62,8 +81,14 @@ variable "ssl_certificate_arn" {
   default     = null
 }
 
+variable "devops_ip_ranges" {
+  description = "CIDR blocks for DevOps access to admin ports (SSH, RDP)"
+  type        = list(string)
+  default     = ["0.0.0.0/0"] # TODO: Restrict to VPN/office IPs in production
+}
+
 # -----------------------------------------------------------------------------
-# EKS VARIABLES (Add these to modules/environment/variables.tf)
+# EKS CLUSTER CONFIGURATION
 # -----------------------------------------------------------------------------
 
 variable "kubernetes_version" {
@@ -75,7 +100,7 @@ variable "kubernetes_version" {
 variable "eks_public_access_cidrs" {
   description = "CIDR blocks that can access the EKS public API endpoint"
   type        = list(string)
-  default     = ["0.0.0.0/0"] # Restrict this in production
+  default     = ["0.0.0.0/0"] # TODO: Restrict in production
 }
 
 variable "eks_aws_auth_roles" {
@@ -89,10 +114,9 @@ variable "eks_aws_auth_roles" {
 }
 
 # -----------------------------------------------------------------------------
-# EKS VARIABLES
+# EKS NODE GROUP CONFIGURATION
 # -----------------------------------------------------------------------------
 
-# Node Group Configuration
 variable "eks_node_instance_types" {
   description = "Instance types for EKS nodes"
   type        = list(string)
@@ -127,10 +151,4 @@ variable "eks_node_disk_size" {
   description = "Disk size in GB for worker nodes"
   type        = number
   default     = 50
-}
-
-variable "devops_ip_ranges" {
-  description = "CIDR blocks for DevOps access to admin ports (SSH, RDP)"
-  type        = list(string)
-  default     = ["0.0.0.0/0"] # TODO: Restrict to VPN/office IPs in production
 }

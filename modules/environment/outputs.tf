@@ -1,6 +1,19 @@
-# environments/production/outputs.tf
+# -----------------------------------------------------------------------------
+# OUTPUTS
+# -----------------------------------------------------------------------------
+#
+# This file defines output values that expose information about created resources.
+# Outputs serve multiple purposes:
+#   - Reference values in other Terraform configurations
+#   - Display important information after deployment (terraform output)
+#   - Pass values to CI/CD pipelines or external systems
+#   - Document key resource identifiers and endpoints
+# -----------------------------------------------------------------------------
 
-# VPC Outputs
+# -----------------------------------------------------------------------------
+# VPC & NETWORKING OUTPUTS
+# -----------------------------------------------------------------------------
+
 output "vpc_id" {
   description = "ID of the VPC"
   value       = module.networking.vpc_id
@@ -26,7 +39,10 @@ output "private_data_subnet_ids" {
   value       = module.networking.private_data_subnet_ids
 }
 
-# WAF Outputs
+# -----------------------------------------------------------------------------
+# WAF OUTPUTS
+# -----------------------------------------------------------------------------
+
 output "waf_web_acl_arn" {
   description = "ARN of the WAF WebACL"
   value       = module.waf.web_acl_arn
@@ -37,7 +53,10 @@ output "waf_web_acl_name" {
   value       = module.waf.web_acl_name
 }
 
-# ALB Outputs
+# -----------------------------------------------------------------------------
+# LOAD BALANCER OUTPUTS
+# -----------------------------------------------------------------------------
+
 output "public_alb_dns_name" {
   description = "DNS name of the public ALB"
   value       = module.alb_public.alb_dns_name
@@ -48,25 +67,37 @@ output "internal_alb_dns_name" {
   value       = module.alb_internal.alb_dns_name
 }
 
-# EC2 Outputs
+# -----------------------------------------------------------------------------
+# EC2 OUTPUTS
+# -----------------------------------------------------------------------------
+
 output "ec2_autoscaling_group_name" {
   description = "Name of the EC2 Auto Scaling Group"
   value       = module.ec2_app.autoscaling_group_name
 }
 
-# Security Group Outputs
+# -----------------------------------------------------------------------------
+# SECURITY GROUP OUTPUTS
+# -----------------------------------------------------------------------------
+
 output "security_group_ids" {
   description = "Map of security group IDs"
   value       = { for k, v in module.security_groups : k => v.security_group_id }
 }
 
-# Parameter Store Outputs
+# -----------------------------------------------------------------------------
+# PARAMETER STORE OUTPUTS
+# -----------------------------------------------------------------------------
+
 output "parameter_names" {
   description = "Map of Parameter Store parameter names"
   value       = module.parameter_store.parameter_names
 }
 
-# RDS Outputs
+# -----------------------------------------------------------------------------
+# RDS DATABASE OUTPUTS
+# -----------------------------------------------------------------------------
+
 output "rds_endpoint" {
   description = "RDS instance endpoint"
   value       = module.rds.endpoint
@@ -92,7 +123,10 @@ output "rds_arn" {
   value       = module.rds.arn
 }
 
-# Elasticache Outputs
+# -----------------------------------------------------------------------------
+# ELASTICACHE (REDIS) OUTPUTS
+# -----------------------------------------------------------------------------
+
 output "redis_primary_endpoint" {
   description = "Redis primary endpoint"
   value       = module.elasticache.primary_endpoint_address
@@ -103,7 +137,10 @@ output "redis_reader_endpoint" {
   value       = module.elasticache.reader_endpoint_address
 }
 
-# MSK Outputs
+# -----------------------------------------------------------------------------
+# MSK (KAFKA) OUTPUTS
+# -----------------------------------------------------------------------------
+
 output "msk_bootstrap_brokers_tls" {
   description = "MSK TLS bootstrap brokers"
   value       = module.msk.bootstrap_brokers_tls
@@ -114,7 +151,10 @@ output "msk_zookeeper_connect_string" {
   value       = module.msk.zookeeper_connect_string
 }
 
-# OpenSearch Outputs
+# -----------------------------------------------------------------------------
+# OPENSEARCH OUTPUTS
+# -----------------------------------------------------------------------------
+
 output "opensearch_endpoint" {
   description = "OpenSearch domain endpoint"
   value       = module.opensearch.endpoint

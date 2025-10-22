@@ -1,12 +1,38 @@
-# ----------------------------------------------------------------
-# ALB Module Test Suite
+# -----------------------------------------------------------------------------
+# ALB MODULE - TEST SUITE
+# -----------------------------------------------------------------------------
 #
-# Tests the Application Load Balancer module for clean plan
-# execution with various configurations, conditional HTTPS
-# listener creation, HTTP listener behavior, target group
-# configuration, and internal vs external ALB deployment.
-# ----------------------------------------------------------------
+# This test suite validates the Application Load Balancer module functionality
+# across various configuration scenarios. Tests use Terraform's native testing
+# framework to verify resource creation, conditional logic, and configuration
+# correctness without requiring actual AWS infrastructure deployment.
+#
+# Test Categories:
+#   - Basic Configuration: ALB creation without HTTPS
+#   - HTTPS Configuration: Certificate-based HTTPS listener and redirects
+#   - Internal vs External: Network visibility settings
+#   - Target Groups: Multiple target group configurations
+#   - Advanced Features: Stickiness, deregistration delay, security settings
+#   - Resource Validation: Attribute accessibility and output verification
+#
+# Testing Approach:
+#   - Uses terraform plan to validate resource configuration
+#   - Mock values for VPC, subnets, and security groups
+#   - Assertions verify expected behavior without AWS API calls
+#   - Tests conditional resource creation (HTTPS listener, redirects)
+#
+# IMPORTANT:
+#   - Tests run in plan mode only (no actual infrastructure created)
+#   - Mock values must be syntactically valid AWS resource IDs
+#   - Assertions validate Terraform configuration, not runtime behavior
+# -----------------------------------------------------------------------------
 
+# -----------------------------------------------------------------------------
+# TEST VARIABLES
+# -----------------------------------------------------------------------------
+
+# Mock AWS resources for testing
+# These values simulate actual AWS resource IDs without requiring real infrastructure
 variables {
   # Mock VPC and networking resources
   vpc_id     = "vpc-12345678"
@@ -19,10 +45,16 @@ variables {
   test_certificate_arn = "arn:aws:acm:us-east-1:123456789012:certificate/12345678-1234-1234-1234-123456789012"
 }
 
-# ----------------------------------------------------------------
-# Basic ALB without HTTPS certificate
-# Expected: HTTP listener forwards to target group (no redirect)
-# ----------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# BASIC ALB WITHOUT HTTPS CERTIFICATE
+# -----------------------------------------------------------------------------
+
+# Validates basic ALB creation with HTTP-only configuration
+# Expected Behavior:
+#   - ALB created as internet-facing
+#   - HTTP listener forwards to target group (no redirect)
+#   - HTTPS listener NOT created
+#   - Target group created with health check configuration
 run "basic_alb_without_https" {
   command = plan
 
@@ -47,53 +79,75 @@ run "basic_alb_without_https" {
     }
   }
 
-  # Assert ALB is created
+  # -------------------------------------------------------------------------
+  # ALB CONFIGURATION ASSERTIONS
+  # -------------------------------------------------------------------------
+
+  # Verify ALB name matches input
   assert {
     condition     = aws_lb.this.name == "test-alb-basic"
     error_message = "ALB name should match input"
   }
 
-  # Assert ALB is internet-facing
+  # Verify ALB is internet-facing
   assert {
     condition     = aws_lb.this.internal == false
     error_message = "ALB should be internet-facing"
   }
 
-  # Assert HTTP listener exists
+  # -------------------------------------------------------------------------
+  # HTTP LISTENER ASSERTIONS
+  # -------------------------------------------------------------------------
+
+  # Verify HTTP listener exists on port 80
   assert {
     condition     = aws_lb_listener.http.port == 80
     error_message = "HTTP listener should listen on port 80"
   }
 
-  # Assert HTTP listener forwards (not redirects) when no certificate
+  # Verify HTTP listener forwards (not redirects) when no certificate
   assert {
     condition     = length([for action in aws_lb_listener.http.default_action : action if action.type == "forward"]) > 0
     error_message = "HTTP listener should forward to target group when no certificate provided"
   }
 
-  # Assert HTTPS listener is NOT created
+  # -------------------------------------------------------------------------
+  # HTTPS LISTENER ASSERTIONS
+  # -------------------------------------------------------------------------
+
+  # Verify HTTPS listener is NOT created without certificate
   assert {
     condition     = length(aws_lb_listener.https) == 0
     error_message = "HTTPS listener should not be created without certificate"
   }
 
-  # Assert target group is created
+  # -------------------------------------------------------------------------
+  # TARGET GROUP ASSERTIONS
+  # -------------------------------------------------------------------------
+
+  # Verify target group creation
   assert {
     condition     = length(aws_lb_target_group.this) == 1
     error_message = "Should create exactly one target group"
   }
 
-  # Assert target group health check path
+  # Verify target group health check path
   assert {
     condition     = aws_lb_target_group.this["app"].health_check[0].path == "/health"
     error_message = "Target group health check path should match input"
   }
 }
 
-# ----------------------------------------------------------------
-# ALB with HTTPS certificate
-# Expected: HTTP redirects to HTTPS, HTTPS listener created
-# ----------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# ALB WITH HTTPS CERTIFICATE
+# -----------------------------------------------------------------------------
+
+# Validates ALB with HTTPS configuration
+# Expected Behavior:
+#   - HTTP listener redirects to HTTPS (301 permanent)
+#   - HTTPS listener created on port 443
+#   - Certificate attached to HTTPS listener
+#   - TLS 1.2 minimum security policy enforced
 run "alb_with_https_certificate" {
   command = plan
 
@@ -117,53 +171,65 @@ run "alb_with_https_certificate" {
     }
   }
 
-  # Assert HTTP listener redirects to HTTPS
+  # -------------------------------------------------------------------------
+  # HTTP REDIRECT ASSERTIONS
+  # -------------------------------------------------------------------------
+
+  # Verify HTTP listener redirects to HTTPS
   assert {
     condition     = length([for action in aws_lb_listener.http.default_action : action if action.type == "redirect"]) > 0
     error_message = "HTTP listener should redirect to HTTPS when certificate provided"
   }
 
-  # Assert redirect goes to port 443
+  # Verify redirect targets port 443
   assert {
     condition     = try(aws_lb_listener.http.default_action[0].redirect[0].port, "") == "443"
     error_message = "HTTP redirect should target port 443"
   }
 
-  # Assert redirect is permanent (301)
+  # Verify redirect is permanent (301)
   assert {
     condition     = try(aws_lb_listener.http.default_action[0].redirect[0].status_code, "") == "HTTP_301"
     error_message = "HTTP redirect should use 301 status code"
   }
 
-  # Assert HTTPS listener IS created
+  # -------------------------------------------------------------------------
+  # HTTPS LISTENER ASSERTIONS
+  # -------------------------------------------------------------------------
+
+  # Verify HTTPS listener IS created
   assert {
     condition     = length(aws_lb_listener.https) == 1
     error_message = "HTTPS listener should be created when certificate provided"
   }
 
-  # Assert HTTPS listener uses port 443
+  # Verify HTTPS listener uses port 443
   assert {
     condition     = aws_lb_listener.https[0].port == 443
     error_message = "HTTPS listener should use port 443"
   }
 
-  # Assert HTTPS listener uses correct certificate
+  # Verify HTTPS listener uses correct certificate
   assert {
     condition     = aws_lb_listener.https[0].certificate_arn == var.test_certificate_arn
     error_message = "HTTPS listener should use provided certificate"
   }
 
-  # Assert HTTPS listener uses secure TLS policy
+  # Verify HTTPS listener uses secure TLS policy
   assert {
     condition     = aws_lb_listener.https[0].ssl_policy == "ELBSecurityPolicy-TLS-1-2-2017-01"
     error_message = "HTTPS listener should use TLS 1.2 minimum policy"
   }
 }
 
-# ----------------------------------------------------------------
-# Internal ALB configuration
-# Expected: ALB marked as internal
-# ----------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# INTERNAL ALB CONFIGURATION
+# -----------------------------------------------------------------------------
+
+# Validates internal ALB for private network access
+# Expected Behavior:
+#   - ALB marked as internal
+#   - Deployed across all provided subnets
 run "internal_alb" {
   command = plan
 
@@ -184,23 +250,32 @@ run "internal_alb" {
     }
   }
 
-  # Assert ALB is internal
+  # -------------------------------------------------------------------------
+  # INTERNAL ALB ASSERTIONS
+  # -------------------------------------------------------------------------
+
+  # Verify ALB is internal
   assert {
     condition     = aws_lb.this.internal == true
     error_message = "ALB should be internal when configured"
   }
 
-  # Assert subnets are correctly assigned
+  # Verify subnets are correctly assigned
   assert {
     condition     = length(aws_lb.this.subnets) == 3
     error_message = "ALB should be deployed across all provided subnets"
   }
 }
 
-# ----------------------------------------------------------------
-# Multiple target groups
-# Expected: All target groups created with correct configuration
-# ----------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# MULTIPLE TARGET GROUPS
+# -----------------------------------------------------------------------------
+
+# Validates multiple target group creation with different configurations
+# Expected Behavior:
+#   - All target groups created with unique configurations
+#   - Each target group has independent health check settings
+#   - Target types (instance vs IP) correctly configured
 run "multiple_target_groups" {
   command = plan
 
@@ -231,13 +306,21 @@ run "multiple_target_groups" {
     }
   }
 
-  # Assert both target groups are created
+  # -------------------------------------------------------------------------
+  # TARGET GROUP COUNT ASSERTIONS
+  # -------------------------------------------------------------------------
+
+  # Verify both target groups are created
   assert {
     condition     = length(aws_lb_target_group.this) == 2
     error_message = "Should create both target groups"
   }
 
-  # Assert first target group configuration
+  # -------------------------------------------------------------------------
+  # APP TARGET GROUP ASSERTIONS
+  # -------------------------------------------------------------------------
+
+  # Verify app target group configuration
   assert {
     condition     = aws_lb_target_group.this["app"].port == 8080
     error_message = "App target group should use port 8080"
@@ -248,7 +331,11 @@ run "multiple_target_groups" {
     error_message = "App target group should use instance target type"
   }
 
-  # Assert second target group configuration
+  # -------------------------------------------------------------------------
+  # API TARGET GROUP ASSERTIONS
+  # -------------------------------------------------------------------------
+
+  # Verify API target group configuration
   assert {
     condition     = aws_lb_target_group.this["api"].port == 8081
     error_message = "API target group should use port 8081"
@@ -259,17 +346,21 @@ run "multiple_target_groups" {
     error_message = "API target group should use IP target type"
   }
 
-  # Assert health check paths are different
+  # Verify health check paths are different
   assert {
     condition     = aws_lb_target_group.this["api"].health_check[0].path == "/api/health"
     error_message = "API target group should have correct health check path"
   }
 }
 
-# ----------------------------------------------------------------
-# Target group with stickiness
-# Expected: Stickiness configured when provided
-# ----------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# TARGET GROUP WITH STICKINESS
+# -----------------------------------------------------------------------------
+
+# Validates session stickiness configuration
+# Expected Behavior:
+#   - Stickiness enabled when configured
+#   - Cookie duration matches specified value
 run "target_group_stickiness" {
   command = plan
 
@@ -295,7 +386,11 @@ run "target_group_stickiness" {
     }
   }
 
-  # Assert stickiness is configured
+  # -------------------------------------------------------------------------
+  # STICKINESS ASSERTIONS
+  # -------------------------------------------------------------------------
+
+  # Verify stickiness is configured
   assert {
     condition     = aws_lb_target_group.this["app"].stickiness[0].enabled == true
     error_message = "Stickiness should be enabled when configured"
@@ -307,10 +402,14 @@ run "target_group_stickiness" {
   }
 }
 
-# ----------------------------------------------------------------
-# ALB security settings
-# Expected: Secure defaults applied
-# ----------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# ALB SECURITY SETTINGS
+# -----------------------------------------------------------------------------
+
+# Validates security-related ALB configuration
+# Expected Behavior:
+#   - HTTP/2 enabled for performance
+#   - Invalid header fields dropped for security
 run "security_settings" {
   command = plan
 
@@ -333,26 +432,34 @@ run "security_settings" {
     }
   }
 
-  # Assert HTTP/2 is enabled
+  # -------------------------------------------------------------------------
+  # SECURITY FEATURE ASSERTIONS
+  # -------------------------------------------------------------------------
+
+  # Verify HTTP/2 is enabled
   assert {
     condition     = aws_lb.this.enable_http2 == true
     error_message = "HTTP/2 should be enabled"
   }
 
-  # Assert invalid headers are dropped
+  # Verify invalid headers are dropped
   assert {
     condition     = aws_lb.this.drop_invalid_header_fields == true
     error_message = "Invalid header fields should be dropped for security"
   }
 
-  # Cross-zone load balancing is enabled by default but may be null during plan
-  # Skipping assertion as this value is not determinable until apply
+  # Note: Cross-zone load balancing is enabled by default but may be null
+  # during plan phase, so we skip assertion as value is not determinable
+  # until apply
 }
 
-# ----------------------------------------------------------------
-# Target group deregistration delay
-# Expected: Custom deregistration delay applied
-# ----------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# CUSTOM DEREGISTRATION DELAY
+# -----------------------------------------------------------------------------
+
+# Validates custom deregistration delay configuration
+# Expected Behavior:
+#   - Target group uses specified deregistration delay
 run "custom_deregistration_delay" {
   command = plan
 
@@ -374,17 +481,26 @@ run "custom_deregistration_delay" {
     }
   }
 
-  # Assert custom deregistration delay (convert to number for comparison)
+  # -------------------------------------------------------------------------
+  # DEREGISTRATION DELAY ASSERTIONS
+  # -------------------------------------------------------------------------
+
+  # Verify custom deregistration delay (convert to number for comparison)
   assert {
     condition     = tonumber(aws_lb_target_group.this["app"].deregistration_delay) == 60
     error_message = "Target group should use custom deregistration delay"
   }
 }
 
-# ----------------------------------------------------------------
-# Verify resource attributes are accessible
-# Expected: Core ALB and target group attributes are set
-# ----------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# RESOURCE ATTRIBUTE VERIFICATION
+# -----------------------------------------------------------------------------
+
+# Validates that all resource attributes are accessible
+# Expected Behavior:
+#   - ALB attributes are set and accessible
+#   - Target group attributes are set and accessible
+#   - Listener attributes are set and accessible
 run "verify_resource_attributes" {
   command = plan
 
@@ -406,25 +522,29 @@ run "verify_resource_attributes" {
     }
   }
 
-  # Assert ALB attributes are set
+  # -------------------------------------------------------------------------
+  # ATTRIBUTE ACCESSIBILITY ASSERTIONS
+  # -------------------------------------------------------------------------
+
+  # Verify ALB attributes are set
   assert {
     condition     = aws_lb.this.name == "test-alb-attrs"
     error_message = "ALB name should be accessible"
   }
 
-  # Assert target group attributes are set
+  # Verify target group attributes are set
   assert {
     condition     = aws_lb_target_group.this["app"].port == 8080
     error_message = "Target group port should be accessible"
   }
 
-  # Assert listener attributes are set
+  # Verify HTTP listener attributes are set
   assert {
     condition     = aws_lb_listener.http.port == 80
     error_message = "HTTP listener port should be accessible"
   }
 
-  # Assert HTTPS listener is created with certificate
+  # Verify HTTPS listener is created with certificate
   assert {
     condition     = length(aws_lb_listener.https) == 1
     error_message = "HTTPS listener should exist when certificate provided"

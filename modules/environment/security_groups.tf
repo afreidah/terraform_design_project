@@ -1,12 +1,45 @@
 # -----------------------------------------------------------------------------
-# SECURITY GROUPS
+# SECURITY GROUPS CONFIGURATION
+# -----------------------------------------------------------------------------
+#
+# This file defines all security groups for the environment using a factory
+# pattern. Each security group is configured with specific ingress and egress
+# rules following defense-in-depth principles.
+#
+# Architecture:
+#   - Public ALB:     Internet-facing load balancer (80/443 from 0.0.0.0/0)
+#   - Internal ALB:   VPC-only load balancer (80/443 from VPC CIDR)
+#   - EC2 App:        Application instances (8080 from ALBs, egress to data tier)
+#   - RDS:            PostgreSQL database (5432 from app tier only)
+#   - ElastiCache:    Redis cache (6379 from app tier only)
+#   - OpenSearch:     Search cluster (443 from app tier only)
+#   - MSK:            Kafka cluster (9092/9094 from VPC, inter-broker egress)
+#
+# Security Model:
+#   - Chained security groups (Internet → ALB → App → Data)
+#   - Data tier has no internet access (egress_rules = [])
+#   - MSK requires egress for inter-broker replication and Zookeeper
+#   - Admin ports (22/3389) restricted to DevOps IP ranges
+#
+# IMPORTANT:
+#   - MSK is the ONLY data tier service with egress rules (for clustering)
+#   - RDS, ElastiCache, and OpenSearch have NO egress (isolated)
+#   - DevOps IP ranges should be restricted to VPN/office IPs in production
 # -----------------------------------------------------------------------------
 
-# Security Groups Configuration
+# -----------------------------------------------------------------------------
+# SECURITY GROUP FACTORY
+# -----------------------------------------------------------------------------
+
 module "security_groups" {
   source = "../../modules/security-group"
 
   for_each = {
+
+    # -------------------------------------------------------------------------
+    # LOAD BALANCER TIER
+    # -------------------------------------------------------------------------
+
     # Public ALB - Needs internet egress to reach target instances
     alb_public = {
       description = "Security group for public-facing ALB"
@@ -66,6 +99,10 @@ module "security_groups" {
         }
       ]
     }
+
+    # -------------------------------------------------------------------------
+    # APPLICATION TIER
+    # -------------------------------------------------------------------------
 
     # EC2 Application instances
     ec2_app = {
@@ -139,6 +176,10 @@ module "security_groups" {
       ]
     }
 
+    # -------------------------------------------------------------------------
+    # DATA TIER - RELATIONAL DATABASE
+    # -------------------------------------------------------------------------
+
     # RDS PostgreSQL
     rds = {
       description = "Security group for RDS databases"
@@ -153,6 +194,10 @@ module "security_groups" {
       ]
       egress_rules = [] # RDS doesn't need outbound
     }
+
+    # -------------------------------------------------------------------------
+    # DATA TIER - CACHING
+    # -------------------------------------------------------------------------
 
     # ElastiCache Redis
     elasticache = {
@@ -169,6 +214,10 @@ module "security_groups" {
       egress_rules = [] # Redis doesn't need outbound
     }
 
+    # -------------------------------------------------------------------------
+    # DATA TIER - SEARCH
+    # -------------------------------------------------------------------------
+
     # OpenSearch
     elasticsearch = {
       description = "Security group for OpenSearch"
@@ -183,6 +232,18 @@ module "security_groups" {
       ]
       egress_rules = [] # OpenSearch doesn't need outbound
     }
+
+    # -------------------------------------------------------------------------
+    # DATA TIER - STREAMING (KAFKA)
+    # -------------------------------------------------------------------------
+    #
+    # MSK requires egress rules for:
+    #   - Inter-broker replication (9092/9094)
+    #   - Zookeeper coordination (2181)
+    #   - AWS management and metrics (443)
+    #
+    # Without egress, brokers cannot form a cluster or replicate data.
+    # -------------------------------------------------------------------------
 
     # MSK Kafka
     msk = {
@@ -210,9 +271,42 @@ module "security_groups" {
           cidr_blocks = [var.vpc_cidr]
         }
       ]
-      egress_rules = [] # MSK doesn't need outbound
+      egress_rules = [
+        {
+          description = "Inter-broker replication (plaintext)"
+          from_port   = 9092
+          to_port     = 9092
+          protocol    = "tcp"
+          cidr_blocks = [var.vpc_cidr]
+        },
+        {
+          description = "Inter-broker replication (TLS)"
+          from_port   = 9094
+          to_port     = 9094
+          protocol    = "tcp"
+          cidr_blocks = [var.vpc_cidr]
+        },
+        {
+          description = "Zookeeper connections"
+          from_port   = 2181
+          to_port     = 2181
+          protocol    = "tcp"
+          cidr_blocks = [var.vpc_cidr]
+        },
+        {
+          description = "AWS MSK management and metrics"
+          from_port   = 443
+          to_port     = 443
+          protocol    = "tcp"
+          cidr_blocks = [var.vpc_cidr]
+        }
+      ]
     }
   }
+
+  # ---------------------------------------------------------------------------
+  # MODULE CONFIGURATION
+  # ---------------------------------------------------------------------------
 
   name   = "${var.environment}-${each.key}-sg"
   vpc_id = module.networking.vpc_id

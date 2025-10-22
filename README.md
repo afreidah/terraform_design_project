@@ -67,6 +67,8 @@ All sensitive data managed through AWS Systems Manager Parameter Store:
 - API keys
 - Connection strings
 
+Vault is probably preferable to SSM but is outside of the scope of this repo.
+
 **Security Features:**
 - All secrets encrypted with AWS KMS
 - SecureString parameter type
@@ -458,9 +460,7 @@ The proof-of-concept implementation demonstrates a production-ready infrastructu
 make deploy
 ```
 
-### Beyond Requirements
-
-This implementation exceeds the original design exercise requirements by providing:
+### Additional Integrations
 
 - Complete working Terraform codebase
 - Automated testing and validation
@@ -486,4 +486,3 @@ This infrastructure design provides a secure, scalable, and maintainable foundat
 ✅ **Automated Governance** - CI/CD pipeline with security and cost gates  
 ✅ **Operational Excellence** - IaC best practices with comprehensive tooling
 
-The Terraform POC implementation demonstrates that this design is not only theoretically sound but practically deployable, providing teams with a solid starting point for production infrastructure.
