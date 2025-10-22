@@ -1,3 +1,7 @@
+# -----------------------------------------------------------------------------
+# OPENSEARCH MODULE VARIABLES
+# -----------------------------------------------------------------------------
+
 variable "domain_name" {
   description = "Name of the OpenSearch domain"
   type        = string
@@ -40,19 +44,19 @@ variable "dedicated_master_count" {
 }
 
 variable "zone_awareness_enabled" {
-  description = "Enable zone awareness (multi-AZ)"
+  description = "Enable zone awareness for multi-AZ deployment"
   type        = bool
   default     = true
 }
 
 variable "availability_zone_count" {
-  description = "Number of availability zones"
+  description = "Number of availability zones for the domain"
   type        = number
   default     = 3
 }
 
 variable "ebs_enabled" {
-  description = "Enable EBS volumes"
+  description = "Enable EBS volumes for data storage"
   type        = bool
   default     = true
 }
@@ -70,13 +74,13 @@ variable "volume_size" {
 }
 
 variable "iops" {
-  description = "IOPS for gp3 volumes"
+  description = "Baseline IOPS for gp3 volumes"
   type        = number
   default     = 3000
 }
 
 variable "throughput" {
-  description = "Throughput in MB/s for gp3 volumes"
+  description = "Throughput in MiB/s for gp3 volumes"
   type        = number
   default     = 125
 }
@@ -100,7 +104,7 @@ variable "node_to_node_encryption_enabled" {
 }
 
 variable "domain_endpoint_options" {
-  description = "Domain endpoint options"
+  description = "Domain endpoint HTTPS and TLS configuration"
   type = object({
     enforce_https       = bool
     tls_security_policy = string
@@ -112,52 +116,58 @@ variable "domain_endpoint_options" {
 }
 
 variable "advanced_security_options" {
-  description = "Advanced security options"
+  description = "Advanced security options for fine-grained access control"
   type = object({
     enabled                        = bool
     internal_user_database_enabled = bool
     master_user_name               = string
     master_user_password           = string
   })
+  default = {
+    enabled                        = false
+    internal_user_database_enabled = false
+    master_user_name               = ""
+    master_user_password           = ""
+  }
   sensitive = true
 }
 
 variable "subnet_ids" {
-  description = "List of subnet IDs for the OpenSearch domain"
+  description = "List of subnet IDs for the domain"
   type        = list(string)
 }
 
 variable "security_group_ids" {
-  description = "List of security group IDs"
+  description = "List of security group IDs for the domain"
   type        = list(string)
 }
 
 variable "automated_snapshot_start_hour" {
-  description = "Hour during which automated snapshots are taken"
+  description = "Hour during which automated snapshots are taken (UTC)"
   type        = number
   default     = 3
 }
 
+variable "enable_audit_logs" {
+  description = "Enable audit logs"
+  type        = bool
+  default     = false
+}
+
+variable "cloudwatch_retention_days" {
+  description = "CloudWatch log retention period in days"
+  type        = number
+  default     = 7
+}
+
 variable "cloudwatch_kms_key_id" {
-  description = "KMS key ID for CloudWatch Logs encryption"
+  description = "KMS key ID for CloudWatch log encryption"
   type        = string
   default     = null
 }
 
-variable "cloudwatch_retention_days" {
-  description = "CloudWatch log retention in days"
-  type        = number
-  default     = 365
-}
-
-variable "enable_audit_logs" {
-  description = "Enable audit logging"
-  type        = bool
-  default     = true
-}
-
 variable "tags" {
-  description = "Tags to apply to resources"
+  description = "Tags to apply to all resources"
   type        = map(string)
   default     = {}
 }

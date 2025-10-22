@@ -1,8 +1,48 @@
 # -----------------------------------------------------------------------------
-# EKS CLUSTER
+# EKS CLUSTER MODULE
+# -----------------------------------------------------------------------------
+#
+# This module creates a production-ready Amazon Elastic Kubernetes Service
+# (EKS) cluster with security hardening, encryption, logging, and IAM Roles
+# for Service Accounts (IRSA) support.
+#
+# Components Created:
+#   - EKS Cluster: Managed Kubernetes control plane
+#   - IAM Roles: Cluster role and VPC CNI service account role
+#   - Security Groups: Network access control for control plane
+#   - CloudWatch Logs: Control plane audit and diagnostic logging
+#   - OIDC Provider: IAM Roles for Service Accounts (IRSA) integration
+#   - EKS Add-ons: VPC CNI, CoreDNS, kube-proxy
+#   - AWS Auth ConfigMap: IAM to Kubernetes RBAC mapping
+#
+# Features:
+#   - Secrets encryption at rest using KMS
+#   - Control plane logging to CloudWatch
+#   - Private and/or public API endpoint access
+#   - IRSA support for pod-level IAM permissions
+#   - Automated add-on management with version control
+#   - IAM-to-Kubernetes authentication via aws-auth ConfigMap
+#
+# Security Model:
+#   - Secrets Encryption: KMS encryption for Kubernetes secrets
+#   - Network Isolation: Security groups control control plane access
+#   - Audit Logging: CloudWatch logs for compliance and security analysis
+#   - Least Privilege IAM: Separate roles for cluster and service accounts
+#   - IRSA: Pod-level IAM permissions without node-level credentials
+#
+# IMPORTANT:
+#   - Cluster encryption key must be provided via cluster_encryption_key_arn
+#   - OIDC provider enables IRSA for secure pod authentication
+#   - aws-auth ConfigMap management requires kubernetes provider configuration
+#   - Add-on versions should be compatible with kubernetes_version
 # -----------------------------------------------------------------------------
 
-# EKS Cluster IAM Role
+# -----------------------------------------------------------------------------
+# EKS CLUSTER IAM ROLE
+# -----------------------------------------------------------------------------
+
+# IAM role for EKS cluster control plane
+# Allows EKS service to manage AWS resources on behalf of the cluster
 resource "aws_iam_role" "cluster" {
   name = "${var.cluster_name}-cluster-role"
 
@@ -22,18 +62,28 @@ resource "aws_iam_role" "cluster" {
   tags = var.tags
 }
 
-# Attach required policies to cluster role
+# -------------------------------------------------------------------------
+# CLUSTER IAM POLICY ATTACHMENTS
+# -------------------------------------------------------------------------
+
+# Core EKS cluster policy for managing cluster resources
 resource "aws_iam_role_policy_attachment" "cluster_policy" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
   role       = aws_iam_role.cluster.name
 }
 
+# VPC resource controller policy for managing ENIs and IP addresses
 resource "aws_iam_role_policy_attachment" "cluster_vpc_resource_controller" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKSVPCResourceController"
   role       = aws_iam_role.cluster.name
 }
 
-# Security Group for EKS Cluster
+# -----------------------------------------------------------------------------
+# EKS CLUSTER SECURITY GROUP
+# -----------------------------------------------------------------------------
+
+# Security group for EKS control plane
+# Controls network access to the Kubernetes API server
 resource "aws_security_group" "cluster" {
   name        = "${var.cluster_name}-cluster-sg"
   description = "Security group for EKS cluster control plane"
@@ -47,7 +97,12 @@ resource "aws_security_group" "cluster" {
   )
 }
 
-# Allow cluster to communicate with worker nodes
+# -------------------------------------------------------------------------
+# CLUSTER SECURITY GROUP RULES
+# -------------------------------------------------------------------------
+
+# Allow cluster control plane to communicate with worker nodes
+# Required for kubelet and pod communication
 resource "aws_security_group_rule" "cluster_egress_to_nodes" {
   count = var.node_security_group_id != null ? 1 : 0
 
@@ -60,7 +115,8 @@ resource "aws_security_group_rule" "cluster_egress_to_nodes" {
   source_security_group_id = var.node_security_group_id
 }
 
-# Allow cluster to communicate with pods (if using security groups for pods)
+# Allow cluster to reach internet for EKS add-ons and AWS services
+# Required for add-on installation and updates
 resource "aws_security_group_rule" "cluster_egress_to_internet" {
   description       = "Allow cluster to communicate with internet for add-ons"
   type              = "egress"
@@ -71,7 +127,12 @@ resource "aws_security_group_rule" "cluster_egress_to_internet" {
   cidr_blocks       = ["0.0.0.0/0"]
 }
 
-# CloudWatch Log Group for EKS
+# -----------------------------------------------------------------------------
+# CLOUDWATCH LOG GROUP
+# -----------------------------------------------------------------------------
+
+# CloudWatch log group for EKS control plane logs
+# Stores audit logs, API server logs, and other control plane diagnostics
 resource "aws_cloudwatch_log_group" "cluster" {
   name              = "/aws/eks/${var.cluster_name}/cluster"
   retention_in_days = var.cloudwatch_retention_days
@@ -80,12 +141,21 @@ resource "aws_cloudwatch_log_group" "cluster" {
   tags = var.tags
 }
 
-# EKS Cluster
+# -----------------------------------------------------------------------------
+# EKS CLUSTER
+# -----------------------------------------------------------------------------
+
+# Amazon EKS managed Kubernetes cluster
+# Provides managed control plane with optional encryption and logging
 resource "aws_eks_cluster" "this" {
   name     = var.cluster_name
   role_arn = aws_iam_role.cluster.arn
   version  = var.kubernetes_version
 
+  # -------------------------------------------------------------------------
+  # VPC CONFIGURATION
+  # -------------------------------------------------------------------------
+  # Network settings for control plane placement and API endpoint access
   vpc_config {
     subnet_ids              = var.subnet_ids
     endpoint_private_access = var.endpoint_private_access
@@ -94,6 +164,10 @@ resource "aws_eks_cluster" "this" {
     security_group_ids      = [aws_security_group.cluster.id]
   }
 
+  # -------------------------------------------------------------------------
+  # ENCRYPTION CONFIGURATION
+  # -------------------------------------------------------------------------
+  # Encrypts Kubernetes secrets at rest using KMS
   encryption_config {
     provider {
       key_arn = var.cluster_encryption_key_arn
@@ -101,6 +175,10 @@ resource "aws_eks_cluster" "this" {
     resources = ["secrets"]
   }
 
+  # -------------------------------------------------------------------------
+  # CONTROL PLANE LOGGING
+  # -------------------------------------------------------------------------
+  # Enable control plane logs for audit and diagnostics
   enabled_cluster_log_types = var.enabled_cluster_log_types
 
   tags = var.tags
@@ -116,9 +194,11 @@ resource "aws_eks_cluster" "this" {
 # EKS ADD-ONS
 # -----------------------------------------------------------------------------
 
-# Around line 120-130, replace the three addon blocks with:
-
-# VPC CNI Add-on (required for pod networking)
+# -------------------------------------------------------------------------
+# VPC CNI ADD-ON
+# -------------------------------------------------------------------------
+# AWS VPC CNI plugin for Kubernetes pod networking
+# Assigns VPC IP addresses to pods and manages ENIs
 resource "aws_eks_addon" "vpc_cni" {
   cluster_name                = aws_eks_cluster.this.name
   addon_name                  = "vpc-cni"
@@ -130,7 +210,11 @@ resource "aws_eks_addon" "vpc_cni" {
   tags = var.tags
 }
 
-# CoreDNS Add-on
+# -------------------------------------------------------------------------
+# COREDNS ADD-ON
+# -------------------------------------------------------------------------
+# CoreDNS for Kubernetes DNS resolution
+# Provides service discovery within the cluster
 resource "aws_eks_addon" "coredns" {
   cluster_name                = aws_eks_cluster.this.name
   addon_name                  = "coredns"
@@ -145,7 +229,10 @@ resource "aws_eks_addon" "coredns" {
   ]
 }
 
-# kube-proxy Add-on
+# -------------------------------------------------------------------------
+# KUBE-PROXY ADD-ON
+# -------------------------------------------------------------------------
+# kube-proxy for Kubernetes networking and service load balancing
 resource "aws_eks_addon" "kube_proxy" {
   cluster_name                = aws_eks_cluster.this.name
   addon_name                  = "kube-proxy"
@@ -160,6 +247,8 @@ resource "aws_eks_addon" "kube_proxy" {
 # VPC CNI IAM ROLE (IRSA)
 # -----------------------------------------------------------------------------
 
+# Trust policy for VPC CNI service account to assume IAM role
+# Uses OIDC provider for secure authentication
 data "aws_iam_policy_document" "vpc_cni_assume_role" {
   statement {
     actions = ["sts:AssumeRoleWithWebIdentity"]
@@ -170,12 +259,14 @@ data "aws_iam_policy_document" "vpc_cni_assume_role" {
       identifiers = [aws_iam_openid_connect_provider.cluster.arn]
     }
 
+    # Verify the service account is aws-node in kube-system namespace
     condition {
       test     = "StringEquals"
       variable = "${replace(aws_iam_openid_connect_provider.cluster.url, "https://", "")}:sub"
       values   = ["system:serviceaccount:kube-system:aws-node"]
     }
 
+    # Verify the audience is AWS STS
     condition {
       test     = "StringEquals"
       variable = "${replace(aws_iam_openid_connect_provider.cluster.url, "https://", "")}:aud"
@@ -184,6 +275,7 @@ data "aws_iam_policy_document" "vpc_cni_assume_role" {
   }
 }
 
+# IAM role for VPC CNI plugin with IRSA
 resource "aws_iam_role" "vpc_cni" {
   name               = "${var.cluster_name}-vpc-cni-role"
   assume_role_policy = data.aws_iam_policy_document.vpc_cni_assume_role.json
@@ -191,19 +283,24 @@ resource "aws_iam_role" "vpc_cni" {
   tags = var.tags
 }
 
+# Attach AWS managed VPC CNI policy to the role
 resource "aws_iam_role_policy_attachment" "vpc_cni" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
   role       = aws_iam_role.vpc_cni.name
 }
 
 # -----------------------------------------------------------------------------
-# OIDC PROVIDER (for IRSA - IAM Roles for Service Accounts)
+# OIDC PROVIDER (IAM ROLES FOR SERVICE ACCOUNTS)
 # -----------------------------------------------------------------------------
 
+# Retrieve TLS certificate from EKS OIDC issuer
+# Used to establish trust between EKS and AWS IAM
 data "tls_certificate" "cluster" {
   url = aws_eks_cluster.this.identity[0].oidc[0].issuer
 }
 
+# OIDC provider for IAM Roles for Service Accounts (IRSA)
+# Enables Kubernetes service accounts to assume IAM roles
 resource "aws_iam_openid_connect_provider" "cluster" {
   client_id_list  = ["sts.amazonaws.com"]
   thumbprint_list = [data.tls_certificate.cluster.certificates[0].sha1_fingerprint]
@@ -213,13 +310,14 @@ resource "aws_iam_openid_connect_provider" "cluster" {
 }
 
 # -----------------------------------------------------------------------------
-# AWS-AUTH CONFIGMAP (IAM to K8s RBAC mapping)
+# AWS-AUTH CONFIGMAP (IAM TO KUBERNETES RBAC MAPPING)
 # -----------------------------------------------------------------------------
 
-# Data source to get current AWS account
+# Get current AWS account information
 data "aws_caller_identity" "current" {}
 
-# Create aws-auth ConfigMap
+# aws-auth ConfigMap for mapping IAM roles/users to Kubernetes RBAC
+# Enables AWS IAM entities to authenticate to the Kubernetes cluster
 resource "kubernetes_config_map_v1_data" "aws_auth" {
   count = var.manage_aws_auth_configmap ? 1 : 0
 
@@ -229,8 +327,9 @@ resource "kubernetes_config_map_v1_data" "aws_auth" {
   }
 
   data = {
+    # Map IAM roles to Kubernetes groups
     mapRoles = yamlencode(concat(
-      # Node role (required for nodes to join cluster)
+      # Node role (required for worker nodes to join cluster)
       var.node_iam_role_arn != null ? [
         {
           rolearn  = var.node_iam_role_arn
@@ -238,10 +337,11 @@ resource "kubernetes_config_map_v1_data" "aws_auth" {
           groups   = ["system:bootstrappers", "system:nodes"]
         }
       ] : [],
-      # Additional roles (DevOps, Developers, etc.)
+      # Additional IAM roles (DevOps, Developers, etc.)
       var.aws_auth_roles
     ))
 
+    # Map IAM users to Kubernetes groups
     mapUsers = yamlencode(var.aws_auth_users)
   }
 

@@ -1,4 +1,26 @@
 # -----------------------------------------------------------------------------
+# EKS NODE GROUP MODULE - OUTPUT VALUES
+# -----------------------------------------------------------------------------
+#
+# This file exposes attributes of the created EKS Node Group and related
+# resources for use by parent modules, monitoring systems, and external
+# integrations.
+#
+# Output Categories:
+#   - Node Group: EKS node group identifiers and status
+#   - IAM: Role and instance profile for service integrations
+#   - Security: Security group for network rule management
+#   - Launch Template: Template identifiers for version tracking
+#
+# Usage:
+#   - node_group_arn: Reference in CloudWatch alarms and Auto Scaling policies
+#   - iam_role_arn: Add to aws-auth ConfigMap for cluster access
+#   - security_group_id: Configure additional ingress/egress rules
+#   - launch_template_id: Track configuration versions for blue-green deployments
+#   - node_group_resources: Access Auto Scaling Group and remote access SG
+# -----------------------------------------------------------------------------
+
+# -----------------------------------------------------------------------------
 # NODE GROUP OUTPUTS
 # -----------------------------------------------------------------------------
 

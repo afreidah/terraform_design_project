@@ -1,4 +1,23 @@
 # -----------------------------------------------------------------------------
+# EKS NODE GROUP MODULE - INPUT VARIABLES
+# -----------------------------------------------------------------------------
+#
+# This file defines all configurable parameters for the EKS Node Group module,
+# including cluster integration, instance configuration, scaling parameters,
+# security settings, and Kubernetes-specific options.
+#
+# Variable Categories:
+#   - Required Variables: Essential cluster integration parameters
+#   - Instance Configuration: Instance types, capacity, and AMI
+#   - Scaling Configuration: Auto Scaling Group sizing
+#   - Storage Configuration: EBS volume settings
+#   - Security & Access: IAM policies, security groups, monitoring
+#   - Network Configuration: Additional security groups, ALB integration
+#   - Kubernetes Configuration: Labels, taints, bootstrap arguments
+#   - Tagging: Resource tags for organization
+# -----------------------------------------------------------------------------
+
+# -----------------------------------------------------------------------------
 # REQUIRED VARIABLES
 # -----------------------------------------------------------------------------
 
@@ -43,7 +62,7 @@ variable "subnet_ids" {
 }
 
 # -----------------------------------------------------------------------------
-# OPTIONAL VARIABLES
+# INSTANCE CONFIGURATION
 # -----------------------------------------------------------------------------
 
 variable "instance_types" {
@@ -57,6 +76,16 @@ variable "capacity_type" {
   type        = string
   default     = "ON_DEMAND"
 }
+
+variable "ami_id" {
+  description = "AMI ID for worker nodes (uses EKS-optimized AMI if not specified)"
+  type        = string
+  default     = null
+}
+
+# -----------------------------------------------------------------------------
+# SCALING CONFIGURATION
+# -----------------------------------------------------------------------------
 
 variable "desired_size" {
   description = "Desired number of nodes"
@@ -82,6 +111,10 @@ variable "max_unavailable_percentage" {
   default     = 33
 }
 
+# -----------------------------------------------------------------------------
+# STORAGE CONFIGURATION
+# -----------------------------------------------------------------------------
+
 variable "disk_size" {
   description = "Disk size in GB for worker nodes"
   type        = number
@@ -100,11 +133,9 @@ variable "disk_encryption_key_id" {
   default     = null
 }
 
-variable "ami_id" {
-  description = "AMI ID for worker nodes (uses EKS-optimized AMI if not specified)"
-  type        = string
-  default     = null
-}
+# -----------------------------------------------------------------------------
+# SECURITY & ACCESS CONFIGURATION
+# -----------------------------------------------------------------------------
 
 variable "enable_ssm_access" {
   description = "Enable SSM Session Manager access to nodes"
@@ -124,11 +155,9 @@ variable "enable_detailed_monitoring" {
   default     = false
 }
 
-variable "bootstrap_extra_args" {
-  description = "Additional arguments for the bootstrap script"
-  type        = string
-  default     = ""
-}
+# -----------------------------------------------------------------------------
+# NETWORK CONFIGURATION
+# -----------------------------------------------------------------------------
 
 variable "additional_security_group_ids" {
   description = "Additional security group IDs to attach to nodes"
@@ -139,7 +168,17 @@ variable "additional_security_group_ids" {
 variable "alb_security_group_id" {
   description = "Security group ID of ALB (to allow traffic to pods)"
   type        = string
-  default     = "" # Changed from null to empty string
+  default     = ""
+}
+
+# -----------------------------------------------------------------------------
+# KUBERNETES CONFIGURATION
+# -----------------------------------------------------------------------------
+
+variable "bootstrap_extra_args" {
+  description = "Additional arguments for the bootstrap script"
+  type        = string
+  default     = ""
 }
 
 variable "labels" {
@@ -157,6 +196,10 @@ variable "taints" {
   }))
   default = []
 }
+
+# -----------------------------------------------------------------------------
+# TAGGING
+# -----------------------------------------------------------------------------
 
 variable "tags" {
   description = "Tags to apply to resources"

@@ -1,5 +1,27 @@
 # -----------------------------------------------------------------------------
-# CLUSTER OUTPUTS
+# EKS CLUSTER MODULE - OUTPUT VALUES
+# -----------------------------------------------------------------------------
+#
+# This file exposes attributes of the created EKS cluster and related
+# resources for use by parent modules, node groups, and external integrations.
+#
+# Output Categories:
+#   - Cluster Core: Basic cluster identifiers and endpoints
+#   - Authentication: Certificate and OIDC provider information
+#   - Security: IAM roles and security groups
+#   - Add-ons: Installed add-on versions
+#   - Logging: CloudWatch log group information
+#
+# Usage:
+#   - cluster_endpoint: Configure kubectl and CI/CD pipelines
+#   - oidc_provider_arn: Create IRSA roles for workloads
+#   - cluster_certificate_authority_data: Authenticate to cluster
+#   - cluster_security_group_id: Configure node security groups
+#   - Add-on versions: Verify installed component versions
+# -----------------------------------------------------------------------------
+
+# -----------------------------------------------------------------------------
+# CLUSTER CORE OUTPUTS
 # -----------------------------------------------------------------------------
 
 output "cluster_id" {
@@ -27,29 +49,18 @@ output "cluster_platform_version" {
   value       = aws_eks_cluster.this.platform_version
 }
 
+# -----------------------------------------------------------------------------
+# AUTHENTICATION OUTPUTS
+# -----------------------------------------------------------------------------
+
 output "cluster_certificate_authority_data" {
   description = "Base64 encoded certificate data required to communicate with the cluster"
   value       = aws_eks_cluster.this.certificate_authority[0].data
   sensitive   = true
 }
 
-output "cluster_security_group_id" {
-  description = "Security group ID attached to the EKS cluster"
-  value       = aws_security_group.cluster.id
-}
-
-output "cluster_iam_role_arn" {
-  description = "IAM role ARN of the EKS cluster"
-  value       = aws_iam_role.cluster.arn
-}
-
-output "cluster_iam_role_name" {
-  description = "IAM role name of the EKS cluster"
-  value       = aws_iam_role.cluster.name
-}
-
 # -----------------------------------------------------------------------------
-# OIDC PROVIDER OUTPUTS (for IRSA)
+# OIDC PROVIDER OUTPUTS (FOR IRSA)
 # -----------------------------------------------------------------------------
 
 output "oidc_provider_arn" {
@@ -65,6 +76,25 @@ output "oidc_provider_url" {
 output "cluster_oidc_issuer_url" {
   description = "The URL on the EKS cluster OIDC Issuer"
   value       = try(aws_eks_cluster.this.identity[0].oidc[0].issuer, null)
+}
+
+# -----------------------------------------------------------------------------
+# SECURITY OUTPUTS
+# -----------------------------------------------------------------------------
+
+output "cluster_security_group_id" {
+  description = "Security group ID attached to the EKS cluster"
+  value       = aws_security_group.cluster.id
+}
+
+output "cluster_iam_role_arn" {
+  description = "IAM role ARN of the EKS cluster"
+  value       = aws_iam_role.cluster.arn
+}
+
+output "cluster_iam_role_name" {
+  description = "IAM role name of the EKS cluster"
+  value       = aws_iam_role.cluster.name
 }
 
 # -----------------------------------------------------------------------------
@@ -87,7 +117,7 @@ output "kube_proxy_addon_version" {
 }
 
 # -----------------------------------------------------------------------------
-# CLOUDWATCH OUTPUTS
+# CLOUDWATCH LOGGING OUTPUTS
 # -----------------------------------------------------------------------------
 
 output "cloudwatch_log_group_name" {

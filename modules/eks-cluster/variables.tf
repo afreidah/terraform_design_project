@@ -1,4 +1,23 @@
 # -----------------------------------------------------------------------------
+# EKS CLUSTER MODULE - INPUT VARIABLES
+# -----------------------------------------------------------------------------
+#
+# This file defines all configurable parameters for the EKS cluster module,
+# including cluster configuration, networking, security, logging, add-ons,
+# and IAM authentication settings.
+#
+# Variable Categories:
+#   - Required Variables: Essential parameters with no defaults
+#   - Cluster Configuration: Kubernetes version and basic settings
+#   - Network Configuration: VPC, subnets, and API endpoint access
+#   - Security & Encryption: KMS keys and security groups
+#   - Logging: CloudWatch log configuration
+#   - Add-ons: EKS managed add-on versions
+#   - Authentication: aws-auth ConfigMap and IAM mappings
+#   - Tagging: Resource tags for organization
+# -----------------------------------------------------------------------------
+
+# -----------------------------------------------------------------------------
 # REQUIRED VARIABLES
 # -----------------------------------------------------------------------------
 
@@ -23,7 +42,7 @@ variable "cluster_encryption_key_arn" {
 }
 
 # -----------------------------------------------------------------------------
-# OPTIONAL VARIABLES
+# CLUSTER CONFIGURATION
 # -----------------------------------------------------------------------------
 
 variable "kubernetes_version" {
@@ -31,6 +50,10 @@ variable "kubernetes_version" {
   type        = string
   default     = "1.31"
 }
+
+# -----------------------------------------------------------------------------
+# NETWORK CONFIGURATION
+# -----------------------------------------------------------------------------
 
 variable "endpoint_private_access" {
   description = "Enable private API server endpoint"
@@ -50,6 +73,16 @@ variable "public_access_cidrs" {
   default     = ["0.0.0.0/0"]
 }
 
+variable "node_security_group_id" {
+  description = "Security group ID for EKS nodes (optional - for cluster-to-node communication)"
+  type        = string
+  default     = null
+}
+
+# -----------------------------------------------------------------------------
+# LOGGING CONFIGURATION
+# -----------------------------------------------------------------------------
+
 variable "enabled_cluster_log_types" {
   description = "List of control plane logging types to enable"
   type        = list(string)
@@ -68,7 +101,10 @@ variable "cloudwatch_kms_key_id" {
   default     = null
 }
 
-# Add-on versions
+# -----------------------------------------------------------------------------
+# EKS ADD-ON VERSIONS
+# -----------------------------------------------------------------------------
+
 variable "vpc_cni_version" {
   description = "Version of VPC CNI add-on"
   type        = string
@@ -87,14 +123,10 @@ variable "kube_proxy_version" {
   default     = null
 }
 
-# Node security group (for cluster-to-node communication)
-variable "node_security_group_id" {
-  description = "Security group ID for EKS nodes (optional - for cluster-to-node communication)"
-  type        = string
-  default     = null
-}
+# -----------------------------------------------------------------------------
+# AWS AUTH CONFIGMAP CONFIGURATION
+# -----------------------------------------------------------------------------
 
-# AWS Auth ConfigMap
 variable "manage_aws_auth_configmap" {
   description = "Whether to manage the aws-auth ConfigMap"
   type        = bool
@@ -126,6 +158,10 @@ variable "aws_auth_users" {
   }))
   default = []
 }
+
+# -----------------------------------------------------------------------------
+# TAGGING
+# -----------------------------------------------------------------------------
 
 variable "tags" {
   description = "Tags to apply to resources"

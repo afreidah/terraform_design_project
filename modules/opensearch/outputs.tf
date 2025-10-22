@@ -1,3 +1,7 @@
+# -----------------------------------------------------------------------------
+# OPENSEARCH MODULE OUTPUTS
+# -----------------------------------------------------------------------------
+
 output "domain_id" {
   description = "Unique identifier for the domain"
   value       = aws_opensearch_domain.this.domain_id

@@ -1,36 +1,30 @@
-# ----------------------------------------------------------------
-# OpenSearch Module Test Suite
+# -----------------------------------------------------------------------------
+# OPENSEARCH MODULE TEST SUITE
+# -----------------------------------------------------------------------------
 #
-# Module under test:
-#   - aws_opensearch_domain.this
-#   - aws_cloudwatch_log_group.index_slow_logs
-#   - aws_cloudwatch_log_group.search_slow_logs
-#   - aws_cloudwatch_log_group.es_application_logs
-#   - aws_cloudwatch_log_group.audit_logs (conditional)
-#   - aws_cloudwatch_log_resource_policy.this
+# Plan-safe assertions validating domain configuration, encryption settings,
+# VPC options, logging setup, and conditional resource creation. Tests avoid
+# equality checks against computed values like ARNs, endpoints, or IDs.
 #
-# Plan-safe assertions only (no equality against computed ARNs/IDs,
-# endpoints, or dashboard URLs).
-# Focus:
-#   - Domain core shape (name, version, cluster config, EBS)
-#   - Encryption (at-rest / node-to-node)
-#   - Endpoint options (HTTPS, TLS policy)
-#   - VPC options (subnets/SGs counts)
-#   - Logging (CloudWatch groups created & named; audit optional)
-#   - Zone awareness config (when enabled)
-#   - Advanced security options (enabled/disabled)
-#   - Tags
-#   - Output values that are plan-known (domain_name and CWG names)
-# ----------------------------------------------------------------
+# Test Coverage:
+# Domain core configuration including name, version, cluster sizing, and EBS
+# storage settings. Encryption validation for both at-rest and node-to-node
+# encryption. HTTPS enforcement and TLS policy verification. VPC subnet and
+# security group attachment. CloudWatch log group creation and naming. Zone
+# awareness configuration when enabled. Advanced security options for fine-
+# grained access control. Tag propagation to all resources. Output values that
+# are known at plan time.
+# -----------------------------------------------------------------------------
 
-# ----------------------------------------------------------------
-# Test Defaults / Mocks
-# ----------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# TEST DEFAULTS AND MOCK VALUES
+# -----------------------------------------------------------------------------
+
 variables {
   domain_name    = "test-opensearch"
   engine_version = "OpenSearch_2.11"
 
-  # Cluster config
+  # Cluster configuration
   instance_type  = "t3.medium.search"
   instance_count = 3
 
@@ -38,65 +32,66 @@ variables {
   dedicated_master_type    = "t3.small.search"
   dedicated_master_count   = 3
 
-  zone_awareness_enabled   = true
-  availability_zone_count  = 3
+  zone_awareness_enabled  = true
+  availability_zone_count = 3
 
-  # EBS (gp3 -> iops/throughput are used)
-  ebs_enabled  = true
-  volume_type  = "gp3"
-  volume_size  = 100
-  iops         = 3000
-  throughput   = 125
+  # EBS storage with gp3 performance settings
+  ebs_enabled = true
+  volume_type = "gp3"
+  volume_size = 100
+  iops        = 3000
+  throughput  = 125
 
-  # Encryption
+  # Encryption settings
   encrypt_at_rest_enabled         = true
   kms_key_id                      = null
   node_to_node_encryption_enabled = true
 
-  # Endpoint options
+  # Domain endpoint security
   domain_endpoint_options = {
     enforce_https       = true
     tls_security_policy = "Policy-Min-TLS-1-2-2019-07"
   }
 
-  # Advanced security (disabled by default in baseline; object is required)
+  # Advanced security disabled by default
   advanced_security_options = {
     enabled                        = false
     internal_user_database_enabled = false
-    master_user_name               = "unused"
-    master_user_password           = "unused"
+    master_user_name               = ""
+    master_user_password           = ""
   }
 
-  # Networking
-  subnet_ids         = ["subnet-11111111", "subnet-22222222", "subnet-33333333"]
+  # Network configuration
+  subnet_ids         = ["subnet-12345678", "subnet-23456789", "subnet-34567890"]
   security_group_ids = ["sg-12345678"]
 
-  # Snapshots
+  # Snapshot timing
   automated_snapshot_start_hour = 3
 
-  # CloudWatch logging
-  cloudwatch_kms_key_id     = null
-  cloudwatch_retention_days = 365
-  enable_audit_logs         = true
+  # Logging configuration
+  enable_audit_logs           = true
+  cloudwatch_retention_days   = 7
+  cloudwatch_kms_key_id       = null
 
-  # Tags
+  # Resource tagging
   tags = {
     Env  = "test"
     Team = "search"
   }
 }
 
-# ----------------------------------------------------------------
-# Baseline: zone awareness enabled, gp3 EBS, HTTPS enforced, audit logs enabled
-# ----------------------------------------------------------------
-run "baseline_defaults" {
+# Mock providers for testing
+mock_provider "aws" {}
+
+# -----------------------------------------------------------------------------
+# BASELINE CONFIGURATION TEST
+# -----------------------------------------------------------------------------
+# Validates default configuration with all standard features enabled
+
+run "baseline_config" {
   command = plan
 
-  variables {
-    # use defaults
-  }
-
-  # ----- Domain: core shape -----
+  # Domain basic attributes
   assert {
     condition     = aws_opensearch_domain.this.domain_name == var.domain_name
     error_message = "Domain name should match input"
@@ -106,7 +101,7 @@ run "baseline_defaults" {
     error_message = "Engine version should match input"
   }
 
-  # Cluster config
+  # Cluster configuration
   assert {
     condition     = aws_opensearch_domain.this.cluster_config[0].instance_type == var.instance_type
     error_message = "Instance type should match input"
@@ -117,15 +112,15 @@ run "baseline_defaults" {
   }
   assert {
     condition     = aws_opensearch_domain.this.cluster_config[0].dedicated_master_enabled == var.dedicated_master_enabled
-    error_message = "Dedicated master should reflect input"
+    error_message = "Dedicated master should be enabled"
   }
   assert {
     condition     = aws_opensearch_domain.this.cluster_config[0].dedicated_master_type == var.dedicated_master_type
-    error_message = "Dedicated master type should match input"
+    error_message = "Master type should match input"
   }
   assert {
     condition     = aws_opensearch_domain.this.cluster_config[0].dedicated_master_count == var.dedicated_master_count
-    error_message = "Dedicated master count should match input"
+    error_message = "Master count should match input"
   }
 
   # Zone awareness
@@ -138,7 +133,7 @@ run "baseline_defaults" {
     error_message = "AZ count should match input"
   }
 
-  # EBS options (gp3)
+  # EBS options for gp3 volumes
   assert {
     condition     = aws_opensearch_domain.this.ebs_options[0].ebs_enabled == var.ebs_enabled
     error_message = "EBS should reflect input"
@@ -180,7 +175,7 @@ run "baseline_defaults" {
     error_message = "TLS security policy should match input"
   }
 
-  # VPC options (counts only)
+  # VPC options count validation
   assert {
     condition     = length(aws_opensearch_domain.this.vpc_options[0].subnet_ids) == length(var.subnet_ids)
     error_message = "Subnet IDs count should match input"
@@ -190,7 +185,7 @@ run "baseline_defaults" {
     error_message = "Security group IDs count should match input"
   }
 
-  # CloudWatch log groups (always created for 3 types)
+  # CloudWatch log groups always created for three standard log types
   assert {
     condition     = aws_cloudwatch_log_group.index_slow_logs.name == "/aws/opensearch/${var.domain_name}/index-slow-logs"
     error_message = "Index slow logs group name should match expected format"
@@ -204,7 +199,7 @@ run "baseline_defaults" {
     error_message = "Application logs group name should match expected format"
   }
 
-  # Audit logs enabled -> audit log group exists
+  # Audit logs created when enabled
   assert {
     condition     = length(aws_cloudwatch_log_group.audit_logs) == 1
     error_message = "Audit logs group should be created when enable_audit_logs=true"
@@ -214,13 +209,13 @@ run "baseline_defaults" {
     error_message = "Audit logs group name should match expected format"
   }
 
-  # Tags on domain
+  # Tag propagation to domain
   assert {
     condition     = aws_opensearch_domain.this.tags["Env"] == "test" && aws_opensearch_domain.this.tags["Team"] == "search"
     error_message = "Domain should carry Env and Team tags"
   }
 
-  # Outputs (plan-known only)
+  # Plan-known output validation
   assert {
     condition     = output.domain_name == var.domain_name
     error_message = "domain_name output should match input"
@@ -243,10 +238,11 @@ run "baseline_defaults" {
   }
 }
 
-# ----------------------------------------------------------------
-# Audit logs disabled
-# Expected: no audit log group; output null
-# ----------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# AUDIT LOGS DISABLED TEST
+# -----------------------------------------------------------------------------
+# Validates conditional audit log group creation
+
 run "audit_logs_disabled" {
   command = plan
 
@@ -264,10 +260,11 @@ run "audit_logs_disabled" {
   }
 }
 
-# ----------------------------------------------------------------
-# Non-gp3 volumes (e.g., gp2)
-# Plan-safe: assert volume_type only; provider may set iops/throughput at plan.
-# ----------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# NON-GP3 VOLUME TYPE TEST
+# -----------------------------------------------------------------------------
+# Validates EBS configuration with gp2 volume type
+
 run "non_gp3_volume" {
   command = plan
 
@@ -281,9 +278,11 @@ run "non_gp3_volume" {
   }
 }
 
-# ----------------------------------------------------------------
-# Advanced security enabled (internal user DB)
-# ----------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# ADVANCED SECURITY ENABLED TEST
+# -----------------------------------------------------------------------------
+# Validates fine-grained access control with internal user database
+
 run "advanced_security_enabled" {
   command = plan
 
@@ -304,12 +303,13 @@ run "advanced_security_enabled" {
     condition     = aws_opensearch_domain.this.advanced_security_options[0].internal_user_database_enabled == true
     error_message = "Internal user database should be enabled"
   }
-  # Do not assert on master_user_* values (sensitive)
 }
 
-# ----------------------------------------------------------------
-# Endpoint options variant
-# ----------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# ENDPOINT OPTIONS VARIANT TEST
+# -----------------------------------------------------------------------------
+# Validates HTTPS and TLS policy configuration
+
 run "endpoint_options_variant" {
   command = plan
 
@@ -330,9 +330,11 @@ run "endpoint_options_variant" {
   }
 }
 
-# ----------------------------------------------------------------
-# Zone awareness disabled (no zone_awareness_config block)
-# ----------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# ZONE AWARENESS DISABLED TEST
+# -----------------------------------------------------------------------------
+# Validates single-AZ deployment configuration
+
 run "zone_awareness_disabled" {
   command = plan
 
@@ -345,12 +347,13 @@ run "zone_awareness_disabled" {
     condition     = aws_opensearch_domain.this.cluster_config[0].zone_awareness_enabled == false
     error_message = "Zone awareness should be disabled"
   }
-  # When disabled, there is no zone_awareness_config block — avoid indexing it
 }
 
-# ----------------------------------------------------------------
-# Tags verification on log groups
-# ----------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# LOG GROUP TAGS TEST
+# -----------------------------------------------------------------------------
+# Validates tag propagation to CloudWatch log groups
+
 run "log_group_tags" {
   command = plan
 
