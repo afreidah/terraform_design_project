@@ -81,9 +81,8 @@ resource "aws_lb" "this" {
 # Backend pools for routing traffic to application instances or IPs
 # Each target group has independent configuration and health checks
 resource "aws_lb_target_group" "this" {
-  for_each = var.target_groups
-
-  name                 = "${var.name}-${each.key}-tg"
+  for_each             = var.target_groups
+  name_prefix          = "${substr(var.name, 0, 18)}-${each.key}-"
   port                 = each.value.port
   protocol             = each.value.protocol
   vpc_id               = var.vpc_id
