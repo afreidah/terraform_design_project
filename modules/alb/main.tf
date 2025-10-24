@@ -82,7 +82,7 @@ resource "aws_lb" "this" {
 # Each target group has independent configuration and health checks
 resource "aws_lb_target_group" "this" {
   for_each             = var.target_groups
-  name_prefix          = "${substr(var.name, 0, 18)}-${each.key}-"
+  name                 = substr("${var.name}-${each.key}-tg", 0, 32)
   port                 = each.value.port
   protocol             = each.value.protocol
   vpc_id               = var.vpc_id
