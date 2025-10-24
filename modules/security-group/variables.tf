@@ -1,3 +1,7 @@
+# -----------------------------------------------------------------------------
+# SECURITY GROUP MODULE VARIABLES
+# -----------------------------------------------------------------------------
+
 variable "vpc_id" {
   description = "VPC ID where security group will be created"
   type        = string
@@ -15,7 +19,7 @@ variable "description" {
 }
 
 variable "ingress_rules" {
-  description = "List of ingress rules"
+  description = "List of ingress rules for inbound traffic"
   type = list(object({
     from_port                = number
     to_port                  = number
@@ -28,7 +32,7 @@ variable "ingress_rules" {
 }
 
 variable "egress_rules" {
-  description = "List of egress rules"
+  description = "List of egress rules for outbound traffic"
   type = list(object({
     from_port                = number
     to_port                  = number
@@ -41,7 +45,7 @@ variable "egress_rules" {
 }
 
 variable "tags" {
-  description = "Tags to apply to security group"
+  description = "Tags to apply to the security group"
   type        = map(string)
   default     = {}
 }

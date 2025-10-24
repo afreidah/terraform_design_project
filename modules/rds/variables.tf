@@ -1,10 +1,14 @@
+# -----------------------------------------------------------------------------
+# RDS MODULE VARIABLES
+# -----------------------------------------------------------------------------
+
 variable "identifier" {
   description = "Unique identifier for the RDS instance"
   type        = string
 }
 
 variable "engine" {
-  description = "Database engine (e.g., postgres, mysql)"
+  description = "Database engine type"
   type        = string
   default     = "postgres"
 }
@@ -32,7 +36,7 @@ variable "max_allocated_storage" {
 }
 
 variable "storage_type" {
-  description = "Storage type (gp2, gp3, io1)"
+  description = "Storage type for the RDS instance"
   type        = string
   default     = "gp3"
 }
@@ -186,11 +190,11 @@ variable "monitoring_role_arn" {
 variable "deletion_protection" {
   description = "Enable deletion protection for RDS instance"
   type        = bool
-  default     = true # Secure by default!
+  default     = true
 }
 
 variable "tags" {
-  description = "Tags to apply to resources"
+  description = "Tags to apply to all resources"
   type        = map(string)
   default     = {}
 }

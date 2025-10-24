@@ -146,10 +146,9 @@ module "eks_node_group" {
   # -------------------------------------------------------------------------
   # SECURITY & MONITORING
   # -------------------------------------------------------------------------
-  enable_ssm_access          = true                                                   # SSM Session Manager access
-  alb_security_group_id      = module.security_groups["alb_public"].security_group_id # Allow ALB ingress
-  disk_encryption_key_id     = module.kms_eks.key_arn                                 # Encrypt EBS volumes
-  enable_detailed_monitoring = false                                                  # CloudWatch detailed monitoring
+  enable_ssm_access          = true                   # SSM Session Manager access
+  disk_encryption_key_id     = module.kms_eks.key_arn # Encrypt EBS volumes
+  enable_detailed_monitoring = false                  # CloudWatch detailed monitoring
 
   tags = local.common_tags
 

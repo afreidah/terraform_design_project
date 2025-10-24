@@ -120,7 +120,6 @@ test: ## Run terraform test on all modules
 plan: init ## Create execution plan
 	@echo "$(BLUE)Planning changes for $(ENV)...$(NC)"
 	@terraform -chdir=$(TERRAFORM_DIR) plan -out=tfplan
-	@terraform -chdir=$(TERRAFORM_DIR) show -json tfplan > tfplan.json
 	@echo "$(GREEN)✓ Plan created$(NC)"
 
 plan-target: check-env ## Plan specific target (usage: make plan-target TARGET=module.vpc)
@@ -183,7 +182,7 @@ docs: ## Generate module documentation
 	@echo "$(BLUE)Generating documentation...$(NC)"
 	@if command -v terraform-docs >/dev/null 2>&1; then \
 		for dir in modules/*/; do \
-			echo "$(YELLOW)Documenting $$dir...$(NC)"; \
+			echo "Generating docs for $$dir..."; \
 			terraform-docs markdown table $$dir > $$dir/README.md; \
 		done; \
 		echo "$(GREEN)✓ Documentation generated$(NC)"; \
@@ -202,15 +201,16 @@ graph: check-env ## Generate dependency graph
 
 clean: check-env ## Clean temporary files for environment
 	@echo "$(BLUE)Cleaning $(ENV)...$(NC)"
-	cd $(TERRAFORM_DIR) && rm -f $(PLAN_FILE) *.tfstate.backup
+	cd $(TERRAFORM_DIR) && rm -f $(PLAN_FILE) tfplan.txt tfplan.json *.tfstate.backup
 	@echo "$(GREEN)✓ Cleanup complete$(NC)"
 
 clean-all: ## Clean all environments and modules
 	@echo "$(BLUE)Cleaning all environments and modules...$(NC)"
 	find environments -name "$(PLAN_FILE)" -delete
+	find environments -name "tfplan.txt" -delete
+	find environments -name "tfplan.json" -delete
 	find environments -name "*.tfstate.backup" -delete
 	find . -type d -name ".terraform" -exec rm -rf {} + 2>/dev/null || true
-	rm tfplan.json
 	find modules -name ".terraform.lock.hcl" -delete
 	@echo "$(GREEN)✓ All environments and modules cleaned$(NC)"
 
@@ -315,15 +315,19 @@ deploy: all apply ## Full deployment workflow
 pull_request: fmt-check lint test security plan
 	@echo "$(GREEN)✓✓✓ Pull request checks passed - ready for review$(NC)"
 
-merge: check-env ## Apply changes after merge (production only)
-	@if [ "$(ENV)" != "production" ]; then \
-		echo "$(RED)Error: Merge workflow only runs for production$(NC)"; \
-		exit 1; \
-	fi
-	@echo "$(YELLOW)Applying changes to $(ENV)...$(NC)"
-	cd $(TERRAFORM_DIR) && terraform init
-	cd $(TERRAFORM_DIR) && terraform apply -auto-approve
-	@echo "$(GREEN)✓✓✓ Deployment complete$(NC)"
+merge: check-env ## Apply changes after merge
+	@case "$(ENV)" in \
+		production|production-pci) \
+			echo "$(YELLOW)Applying changes to $(ENV)...$(NC)"; \
+			cd $(TERRAFORM_DIR) && terraform init; \
+			cd $(TERRAFORM_DIR) && terraform apply -auto-approve; \
+			echo "$(GREEN)✓✓✓ Deployment complete$(NC)"; \
+			;; \
+		*) \
+			echo "$(RED)Error: Merge workflow only runs for production environments$(NC)"; \
+			exit 1; \
+			;; \
+	esac
 
 ##@ Environment Management
 

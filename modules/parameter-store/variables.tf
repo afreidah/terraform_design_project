@@ -1,5 +1,9 @@
+# -----------------------------------------------------------------------------
+# SSM PARAMETER STORE MODULE VARIABLES
+# -----------------------------------------------------------------------------
+
 variable "parameters" {
-  description = "Map of parameters to create"
+  description = "Map of parameters to create with keys as parameter names and values containing parameter configuration"
   type = map(object({
     description = optional(string)
     type        = optional(string, "SecureString")
@@ -11,7 +15,7 @@ variable "parameters" {
 }
 
 variable "tags" {
-  description = "Tags to apply to parameters"
+  description = "Tags to apply to all parameters"
   type        = map(string)
   default     = {}
 }

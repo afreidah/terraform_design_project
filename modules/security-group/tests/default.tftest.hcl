@@ -1,19 +1,24 @@
-# ----------------------------------------------------------------
-# Security Groups Module Test Suite (plan-safe)
+# -----------------------------------------------------------------------------
+# SECURITY GROUP MODULE TEST SUITE
+# -----------------------------------------------------------------------------
 #
-# Module under test:
-#   - aws_security_group.this
-#   - aws_security_group_rule.ingress (count)
-#   - aws_security_group_rule.egress (count)
+# Plan-safe assertions validating security group creation, rule configuration,
+# and tag propagation. Tests avoid equality checks against computed values
+# like IDs and ARNs that are unknown at plan time.
 #
-# Notes:
-# - Avoid asserting on IDs/ARNs or SG Rule -> SG ID equality at plan time.
-# - Keep each assertion to a single simple expression (no multi-line &&).
-# ----------------------------------------------------------------
+# Test Coverage:
+# Security group creation with VPC association. Ingress rule configuration
+# including protocol, port ranges, CIDR blocks, and descriptions. Egress rule
+# configuration with support for all protocols. Empty rule sets for security
+# groups without traffic rules. Mixed protocol configurations including TCP,
+# UDP, and all protocols. Multiple CIDR blocks per rule. Tag propagation.
+# Output values known at plan time.
+# -----------------------------------------------------------------------------
 
-# ----------------------------------------------------------------
-# Shared defaults / mocks
-# ----------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# TEST DEFAULTS AND MOCK VALUES
+# -----------------------------------------------------------------------------
+
 variables {
   vpc_id = "vpc-12345678"
   name   = "web-sg"
@@ -24,11 +29,11 @@ variables {
   }
 }
 
-# ----------------------------------------------------------------
-# Baseline: public ALB-style SG
-# Ingress: tcp/80, tcp/443 from 0.0.0.0/0
-# Egress: tcp 0-65535 to 0.0.0.0/0
-# ----------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# BASELINE PUBLIC ALB CONFIGURATION TEST
+# -----------------------------------------------------------------------------
+# Validates typical ALB security group with HTTP and HTTPS ingress
+
 run "baseline_public_alb" {
   command = plan
 
@@ -61,7 +66,7 @@ run "baseline_public_alb" {
     ]
   }
 
-  # SG basics
+  # Security group basic configuration
   assert {
     condition     = aws_security_group.this.vpc_id == var.vpc_id
     error_message = "Security group must be created in the provided VPC"
@@ -85,7 +90,7 @@ run "baseline_public_alb" {
     error_message = "Should create two ingress rules (80 and 443)"
   }
 
-  # Ingress[0] HTTP
+  # Ingress rule 0 - HTTP
   assert {
     condition     = aws_security_group_rule.ingress[0].type == "ingress"
     error_message = "Ingress[0] type should be ingress"
@@ -115,7 +120,7 @@ run "baseline_public_alb" {
     error_message = "Ingress[0] description mismatch"
   }
 
-  # Ingress[1] HTTPS
+  # Ingress rule 1 - HTTPS
   assert {
     condition     = aws_security_group_rule.ingress[1].type == "ingress"
     error_message = "Ingress[1] type should be ingress"
@@ -175,16 +180,18 @@ run "baseline_public_alb" {
     error_message = "Egress[0] CIDR should be 0.0.0.0/0"
   }
 
-  # Outputs (plan-known)
+  # Plan-known output
   assert {
     condition     = output.security_group_name == var.name
     error_message = "Output security_group_name should match input"
   }
 }
 
-# ----------------------------------------------------------------
-# No rules: empty ingress/egress
-# ----------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# EMPTY RULES TEST
+# -----------------------------------------------------------------------------
+# Validates security group creation without any traffic rules
+
 run "no_rules" {
   command = plan
 
@@ -212,9 +219,11 @@ run "no_rules" {
   }
 }
 
-# ----------------------------------------------------------------
-# Mixed protocols and null descriptions
-# ----------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# MIXED PROTOCOLS TEST
+# -----------------------------------------------------------------------------
+# Validates multiple protocols with optional descriptions
+
 run "mixed_rules_null_descriptions" {
   command = plan
 
@@ -226,7 +235,6 @@ run "mixed_rules_null_descriptions" {
         to_port     = 22
         protocol    = "tcp"
         cidr_blocks = ["10.0.0.0/8"]
-        # description intentionally omitted -> null
       },
       {
         from_port   = 1194
@@ -240,9 +248,8 @@ run "mixed_rules_null_descriptions" {
       {
         from_port   = 0
         to_port     = 0
-        protocol    = "-1" # all protocols
+        protocol    = "-1"
         cidr_blocks = ["0.0.0.0/0"]
-        # description omitted -> null
       }
     ]
   }
@@ -252,7 +259,7 @@ run "mixed_rules_null_descriptions" {
     error_message = "SG name should be mixed-sg"
   }
 
-  # Ingress[0] SSH
+  # Ingress rule 0 - SSH with null description
   assert {
     condition     = aws_security_group_rule.ingress[0].protocol == "tcp"
     error_message = "Ingress[0] protocol should be tcp"
@@ -270,7 +277,7 @@ run "mixed_rules_null_descriptions" {
     error_message = "Ingress[0] description should be null when omitted"
   }
 
-  # Ingress[1] OpenVPN UDP
+  # Ingress rule 1 - OpenVPN UDP
   assert {
     condition     = aws_security_group_rule.ingress[1].protocol == "udp"
     error_message = "Ingress[1] protocol should be udp"
@@ -306,16 +313,18 @@ run "mixed_rules_null_descriptions" {
     error_message = "Egress description should be null when omitted"
   }
 
-  # Output
+  # Output validation
   assert {
     condition     = output.security_group_name == "mixed-sg"
     error_message = "Output security_group_name should be mixed-sg"
   }
 }
 
-# ----------------------------------------------------------------
-# Wide-open egress convention (typical default)
-# ----------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# WIDE OPEN EGRESS TEST
+# -----------------------------------------------------------------------------
+# Validates typical default egress configuration with multiple CIDRs
+
 run "wide_open_egress" {
   command = plan
 

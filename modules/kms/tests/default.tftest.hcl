@@ -1,21 +1,41 @@
-# ----------------------------------------------------------------
-# KMS Module Test Suite
+# -----------------------------------------------------------------------------
+# KMS KEY MODULE - TEST SUITE
+# -----------------------------------------------------------------------------
 #
-# Module under test:
-#   - aws_kms_key.this
-#   - aws_kms_alias.this
+# This test suite validates the KMS key module functionality across various
+# configuration scenarios. Tests use Terraform's native testing framework to
+# verify key creation, rotation settings, deletion protection, policy
+# configuration, and conditional alias creation without requiring actual AWS
+# infrastructure deployment.
 #
-# Plan-safe assertions only (no equality against computed ARNs/IDs).
-# Focus:
-#   - Key description, rotation, deletion window, tags
-#   - Optional alias creation and alias name shape
-#   - Policy presence when provided
-#   - Output shapes for alias values
-# ----------------------------------------------------------------
+# Test Categories:
+#   - Basic Key: Key creation without alias
+#   - Key with Alias: Conditional alias creation and naming
+#   - Rotation Settings: Key rotation enabled/disabled
+#   - Deletion Protection: Custom deletion window configuration
+#   - Key Policy: Explicit policy validation
+#   - Tagging: Tag merge validation
+#   - Outputs: Output shape validation with and without alias
+#
+# Testing Approach:
+#   - Uses terraform plan to validate resource configuration
+#   - Mock descriptions, policies, and alias names
+#   - Assertions verify expected behavior without AWS API calls
+#   - Tests conditional resource creation (alias)
+#
+# IMPORTANT:
+#   - Tests run in plan mode only (no actual infrastructure created)
+#   - Key policies validated via regex pattern matching
+#   - Alias outputs are null when alias_name not provided
+#   - Deletion window must be between 7 and 30 days
+# -----------------------------------------------------------------------------
 
-# ----------------------------------------------------------------
-# Test Defaults / Mocks
-# ----------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# TEST DEFAULTS / MOCKS
+# -----------------------------------------------------------------------------
+
+# Mock KMS key configuration for testing
+# These values simulate production key creation without requiring real AWS resources
 variables {
   # Common description
   description = "Test KMS key"
@@ -34,10 +54,16 @@ variables {
   }
 }
 
-# ----------------------------------------------------------------
-# Basic key, no alias
-# Expected: description/tags/rotation/deletion window match inputs
-# ----------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# BASIC KEY WITHOUT ALIAS
+# -----------------------------------------------------------------------------
+
+# Validates basic KMS key creation without alias
+# Expected Behavior:
+#   - Key created with description, rotation, deletion window
+#   - Tags applied correctly
+#   - No alias resource created
+#   - Alias outputs are null
 run "basic_key_no_alias" {
   command = plan
 
@@ -53,47 +79,74 @@ run "basic_key_no_alias" {
     }
   }
 
-  # Assert core attributes
+  # -------------------------------------------------------------------------
+  # KEY CORE ATTRIBUTES ASSERTIONS
+  # -------------------------------------------------------------------------
+
+  # Verify key description matches input
   assert {
     condition     = aws_kms_key.this.description == "Test KMS key (no alias)"
     error_message = "KMS key description should match input"
   }
+
+  # Verify key rotation is enabled
   assert {
     condition     = aws_kms_key.this.enable_key_rotation == true
     error_message = "Key rotation should be enabled by default"
   }
+
+  # Verify deletion window is 30 days
   assert {
     condition     = aws_kms_key.this.deletion_window_in_days == 30
     error_message = "Deletion window should be 30 days by default"
   }
 
-  # Tags applied
+  # -------------------------------------------------------------------------
+  # TAG ASSERTIONS
+  # -------------------------------------------------------------------------
+
+  # Verify tags are applied correctly
   assert {
     condition     = aws_kms_key.this.tags["Env"] == "test" && aws_kms_key.this.tags["Team"] == "security"
     error_message = "KMS key should carry Env and Team tags"
   }
 
-  # No alias resources created
+  # -------------------------------------------------------------------------
+  # ALIAS ASSERTIONS
+  # -------------------------------------------------------------------------
+
+  # Verify no alias resources created
   assert {
     condition     = length(aws_kms_alias.this) == 0
     error_message = "Alias should not be created when alias_name is null"
   }
 
-  # Outputs: alias outputs should be null when no alias
+  # -------------------------------------------------------------------------
+  # OUTPUT ASSERTIONS
+  # -------------------------------------------------------------------------
+
+  # Verify alias name output is null
   assert {
     condition     = output.alias_name == null
     error_message = "alias_name output should be null when alias is not created"
   }
+
+  # Verify alias ARN output is null
   assert {
     condition     = output.alias_arn == null
     error_message = "alias_arn output should be null when alias is not created"
   }
 }
 
-# ----------------------------------------------------------------
-# Key with alias
-# Expected: alias resource exists with expected name; outputs reflect name
-# ----------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# KEY WITH ALIAS
+# -----------------------------------------------------------------------------
+
+# Validates KMS key creation with alias
+# Expected Behavior:
+#   - Key created successfully
+#   - Alias resource created with correct name format
+#   - Alias name output matches created alias
 run "key_with_alias" {
   command = plan
 
@@ -105,29 +158,44 @@ run "key_with_alias" {
     policy                  = null
   }
 
-  # Exactly one alias
+  # -------------------------------------------------------------------------
+  # ALIAS CREATION ASSERTIONS
+  # -------------------------------------------------------------------------
+
+  # Verify exactly one alias is created
   assert {
     condition     = length(aws_kms_alias.this) == 1
     error_message = "Exactly one alias should be created when alias_name is set"
   }
 
-  # Alias name shape is plan-known
+  # -------------------------------------------------------------------------
+  # ALIAS NAME FORMAT ASSERTIONS
+  # -------------------------------------------------------------------------
+
+  # Verify alias name has correct prefix
   assert {
     condition     = aws_kms_alias.this[0].name == "alias/app/config"
     error_message = "Alias name should be prefixed with 'alias/'"
   }
 
-  # Output mirrors alias name (plan-known)
+  # -------------------------------------------------------------------------
+  # OUTPUT ASSERTIONS
+  # -------------------------------------------------------------------------
+
+  # Verify output mirrors alias name
   assert {
     condition     = output.alias_name == "alias/app/config"
     error_message = "alias_name output should equal created alias name"
   }
 }
 
-# ----------------------------------------------------------------
-# Rotation disabled
-# Expected: enable_key_rotation=false reflected on resource
-# ----------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# ROTATION DISABLED
+# -----------------------------------------------------------------------------
+
+# Validates key rotation can be disabled
+# Expected Behavior:
+#   - Key created with rotation disabled
 run "rotation_disabled" {
   command = plan
 
@@ -137,16 +205,24 @@ run "rotation_disabled" {
     policy              = null
   }
 
+  # -------------------------------------------------------------------------
+  # ROTATION ASSERTIONS
+  # -------------------------------------------------------------------------
+
+  # Verify rotation is disabled
   assert {
     condition     = aws_kms_key.this.enable_key_rotation == false
     error_message = "Key rotation should be disabled when configured"
   }
 }
 
-# ----------------------------------------------------------------
-# Custom deletion window
-# Expected: deletion_window_in_days matches input
-# ----------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# CUSTOM DELETION WINDOW
+# -----------------------------------------------------------------------------
+
+# Validates custom deletion window configuration
+# Expected Behavior:
+#   - Key created with custom deletion window
 run "custom_deletion_window" {
   command = plan
 
@@ -156,29 +232,38 @@ run "custom_deletion_window" {
     policy                  = null
   }
 
+  # -------------------------------------------------------------------------
+  # DELETION WINDOW ASSERTIONS
+  # -------------------------------------------------------------------------
+
+  # Verify deletion window matches input
   assert {
     condition     = aws_kms_key.this.deletion_window_in_days == 7
     error_message = "Deletion window should match configured value"
   }
 }
 
-# ----------------------------------------------------------------
-# Explicit policy provided
-# Expected: policy string is present and includes expected actions
-# ----------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# EXPLICIT KEY POLICY
+# -----------------------------------------------------------------------------
+
+# Validates custom key policy configuration
+# Expected Behavior:
+#   - Key created with explicit policy
+#   - Policy contains expected KMS actions
 run "explicit_policy" {
   command = plan
 
   variables {
     description = "Key with explicit policy"
     policy = jsonencode({
-      Version   = "2012-10-17"
+      Version = "2012-10-17"
       Statement = [
         {
-          Sid      = "AllowBasic"
-          Effect   = "Allow"
+          Sid       = "AllowBasic"
+          Effect    = "Allow"
           Principal = { AWS = "*" }
-          Action   = [
+          Action = [
             "kms:Encrypt",
             "kms:Decrypt",
             "kms:DescribeKey"
@@ -189,21 +274,30 @@ run "explicit_policy" {
     })
   }
 
-  # Policy contains kms:Encrypt and kms:Decrypt (string check)
+  # -------------------------------------------------------------------------
+  # POLICY CONTENT ASSERTIONS
+  # -------------------------------------------------------------------------
+
+  # Verify policy contains kms:Encrypt action
   assert {
     condition     = length(regexall("kms:Encrypt", aws_kms_key.this.policy)) > 0
     error_message = "Policy should include kms:Encrypt"
   }
+
+  # Verify policy contains kms:Decrypt action
   assert {
     condition     = length(regexall("kms:Decrypt", aws_kms_key.this.policy)) > 0
     error_message = "Policy should include kms:Decrypt"
   }
 }
 
-# ----------------------------------------------------------------
-# Tags verification
-# Expected: custom tags present
-# ----------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# TAGS VERIFICATION
+# -----------------------------------------------------------------------------
+
+# Validates tag application to KMS key
+# Expected Behavior:
+#   - All custom tags present on key
 run "tags_verification" {
   command = plan
 
@@ -217,24 +311,36 @@ run "tags_verification" {
     policy = null
   }
 
+  # -------------------------------------------------------------------------
+  # TAG ASSERTIONS
+  # -------------------------------------------------------------------------
+
+  # Verify Env tag present
   assert {
     condition     = aws_kms_key.this.tags["Env"] == "test"
     error_message = "Env tag should be present"
   }
+
+  # Verify Team tag present
   assert {
     condition     = aws_kms_key.this.tags["Team"] == "security"
     error_message = "Team tag should be present"
   }
+
+  # Verify custom Purpose tag present
   assert {
     condition     = aws_kms_key.this.tags["Purpose"] == "kms-tests"
     error_message = "Purpose tag should be present"
   }
 }
 
-# ----------------------------------------------------------------
-# Outputs shape checks (alias present vs absent)
-# Expected: alias_name null when no alias; equals alias/NAME when set
-# ----------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# OUTPUTS SHAPE (NO ALIAS)
+# -----------------------------------------------------------------------------
+
+# Validates output behavior when alias is not created
+# Expected Behavior:
+#   - Alias outputs are null
 run "outputs_shape_no_alias" {
   command = plan
 
@@ -244,16 +350,30 @@ run "outputs_shape_no_alias" {
     policy      = null
   }
 
+  # -------------------------------------------------------------------------
+  # OUTPUT ASSERTIONS
+  # -------------------------------------------------------------------------
+
+  # Verify alias name output is null
   assert {
     condition     = output.alias_name == null
     error_message = "alias_name output should be null when alias not created"
   }
+
+  # Verify alias ARN output is null
   assert {
     condition     = output.alias_arn == null
     error_message = "alias_arn output should be null when alias not created"
   }
 }
 
+# -----------------------------------------------------------------------------
+# OUTPUTS SHAPE (WITH ALIAS)
+# -----------------------------------------------------------------------------
+
+# Validates output behavior when alias is created
+# Expected Behavior:
+#   - Alias name output matches created alias
 run "outputs_shape_with_alias" {
   command = plan
 
@@ -263,9 +383,15 @@ run "outputs_shape_with_alias" {
     policy      = null
   }
 
+  # -------------------------------------------------------------------------
+  # OUTPUT ASSERTIONS
+  # -------------------------------------------------------------------------
+
+  # Verify alias name output matches expected format
   assert {
     condition     = output.alias_name == "alias/service/key"
     error_message = "alias_name output should equal 'alias/<alias_name>'"
   }
-  # alias_arn is provider-computed; do not assert non-null at plan
+
+  # Note: alias_arn is provider-computed and cannot be asserted at plan time
 }
