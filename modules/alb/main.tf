@@ -38,7 +38,7 @@
 # APPLICATION LOAD BALANCER
 # -----------------------------------------------------------------------------
 
-# Layer 7 load balancer for distributing HTTP/HTTPS traffic
+# load balancer for distributing HTTP/HTTPS traffic
 # Can be internet-facing or internal based on var.internal setting
 resource "aws_lb" "this" {
   #tfsec:ignore:aws-elb-alb-not-public Intentional: Public ALB by design
