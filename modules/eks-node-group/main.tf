@@ -187,19 +187,6 @@ resource "aws_security_group_rule" "node_ingress_cluster_https" {
   source_security_group_id = var.cluster_security_group_id
 }
 
-# Allow ALB to reach pods directly (when using AWS Load Balancer Controller)
-resource "aws_security_group_rule" "node_ingress_alb" {
-  for_each = var.alb_security_group_id != "" ? toset(["alb"]) : toset([])
-
-  type                     = "ingress"
-  from_port                = 443
-  to_port                  = 443
-  protocol                 = "tcp"
-  security_group_id        = aws_security_group.node.id
-  source_security_group_id = var.alb_security_group_id
-  description              = "Allow inbound traffic from ALB"
-}
-
 # -------------------------------------------------------------------------
 # NODE EGRESS RULES
 # -------------------------------------------------------------------------
@@ -230,36 +217,32 @@ resource "aws_security_group_rule" "node_egress_internet" {
 # LAUNCH TEMPLATE
 # -----------------------------------------------------------------------------
 
-# Launch template for EKS node group instances
-# Defines instance configuration with security hardening
+# Launch template for EKS worker nodes
+# Defines instance configuration with security best practices
 resource "aws_launch_template" "node" {
   name_prefix = "${var.cluster_name}-${var.node_group_name}-"
-  description = "Launch template for EKS node group ${var.node_group_name}"
+  description = "Launch template for ${var.cluster_name} ${var.node_group_name}"
 
-  image_id      = var.ami_id != null ? var.ami_id : one(data.aws_ssm_parameter.eks_ami[*].value)
-  instance_type = var.instance_types[0] # Default instance type
+  image_id      = var.ami_id != null ? var.ami_id : data.aws_ssm_parameter.eks_ami[0].value
+  instance_type = var.instance_types[0]
 
-  # -------------------------------------------------------------------------
-  # NETWORK CONFIGURATION
-  # -------------------------------------------------------------------------
-  # Attach node security group and any additional security groups
-  vpc_security_group_ids = concat(
-    [aws_security_group.node.id],
-    var.additional_security_group_ids
-  )
-
-  # -------------------------------------------------------------------------
-  # IAM INSTANCE PROFILE
-  # -------------------------------------------------------------------------
-  # Grants nodes permissions to join cluster and access AWS services
+  # Instance profile for IAM role
   iam_instance_profile {
     arn = aws_iam_instance_profile.node.arn
   }
 
-  # -------------------------------------------------------------------------
-  # ROOT VOLUME CONFIGURATION
-  # -------------------------------------------------------------------------
-  # EBS volume with encryption for container storage
+  # Monitoring configuration
+  monitoring {
+    enabled = var.enable_detailed_monitoring
+  }
+
+  # Network configuration (security groups will be attached by EKS)
+  network_interfaces {
+    associate_public_ip_address = false
+    delete_on_termination       = true
+  }
+
+  # Root volume configuration with encryption
   block_device_mappings {
     device_name = "/dev/xvda"
 
@@ -272,29 +255,15 @@ resource "aws_launch_template" "node" {
     }
   }
 
-  # -------------------------------------------------------------------------
-  # INSTANCE METADATA SERVICE (IMDSv2)
-  # -------------------------------------------------------------------------
-  # Enforces IMDSv2 with hop limit 2 for pod access to instance metadata
+  # Metadata service configuration - IMDSv2 enforcement
   metadata_options {
     http_endpoint               = "enabled"
     http_tokens                 = "required"
-    http_put_response_hop_limit = 2 # Required for pods to access IMDS
+    http_put_response_hop_limit = 2
     instance_metadata_tags      = "enabled"
   }
 
-  # -------------------------------------------------------------------------
-  # MONITORING
-  # -------------------------------------------------------------------------
-  # Optional detailed CloudWatch monitoring (1-minute intervals)
-  monitoring {
-    enabled = var.enable_detailed_monitoring
-  }
-
-  # -------------------------------------------------------------------------
-  # USER DATA BOOTSTRAP SCRIPT
-  # -------------------------------------------------------------------------
-  # Configures node to join EKS cluster with custom bootstrap arguments
+  # Bootstrap script for joining cluster
   user_data = base64encode(templatefile("${path.module}/user-data.sh", {
     cluster_name        = var.cluster_name
     cluster_endpoint    = var.cluster_endpoint
@@ -302,10 +271,7 @@ resource "aws_launch_template" "node" {
     bootstrap_arguments = var.bootstrap_extra_args
   }))
 
-  # -------------------------------------------------------------------------
-  # INSTANCE TAGGING
-  # -------------------------------------------------------------------------
-  # Tags applied to launched instances
+  # Tag specifications for resources created by the launch template
   tag_specifications {
     resource_type = "instance"
     tags = merge(
@@ -316,22 +282,14 @@ resource "aws_launch_template" "node" {
     )
   }
 
-  # -------------------------------------------------------------------------
-  # VOLUME TAGGING
-  # -------------------------------------------------------------------------
-  # Tags applied to EBS volumes
   tag_specifications {
     resource_type = "volume"
     tags = merge(
       var.tags,
       {
-        Name = "${var.cluster_name}-${var.node_group_name}-volume"
+        Name = "${var.cluster_name}-${var.node_group_name}"
       }
     )
-  }
-
-  lifecycle {
-    create_before_destroy = true
   }
 
   tags = var.tags
@@ -341,58 +299,40 @@ resource "aws_launch_template" "node" {
 # EKS MANAGED NODE GROUP
 # -----------------------------------------------------------------------------
 
-# EKS managed node group for running Kubernetes workloads
-# Provides self-healing worker nodes with automated updates
+# EKS Managed Node Group with launch template
+# Provides auto-scaling worker nodes for the cluster
 resource "aws_eks_node_group" "this" {
   cluster_name    = var.cluster_name
   node_group_name = var.node_group_name
   node_role_arn   = aws_iam_role.node.arn
   subnet_ids      = var.subnet_ids
-  version         = var.cluster_version
 
-  # -------------------------------------------------------------------------
-  # SCALING CONFIGURATION
-  # -------------------------------------------------------------------------
-  # Auto Scaling Group sizing for the node group
+  # Scaling configuration
   scaling_config {
     desired_size = var.desired_size
     max_size     = var.max_size
     min_size     = var.min_size
   }
 
-  # -------------------------------------------------------------------------
-  # UPDATE CONFIGURATION
-  # -------------------------------------------------------------------------
-  # Control how many nodes can be unavailable during updates
+  # Update configuration for rolling updates
   update_config {
     max_unavailable_percentage = var.max_unavailable_percentage
   }
 
-  # -------------------------------------------------------------------------
-  # LAUNCH TEMPLATE
-  # -------------------------------------------------------------------------
-  # Use custom launch template for additional configuration
+  # Launch template configuration
   launch_template {
     id      = aws_launch_template.node.id
     version = "$Latest"
   }
 
-  # -------------------------------------------------------------------------
-  # INSTANCE CONFIGURATION
-  # -------------------------------------------------------------------------
-  instance_types = var.instance_types
+  # Instance configuration
   capacity_type  = var.capacity_type
+  instance_types = var.instance_types
 
-  # -------------------------------------------------------------------------
-  # KUBERNETES LABELS
-  # -------------------------------------------------------------------------
-  # Custom labels for pod scheduling and node selection
+  # Kubernetes labels
   labels = var.labels
 
-  # -------------------------------------------------------------------------
-  # KUBERNETES TAINTS
-  # -------------------------------------------------------------------------
-  # Taints for controlling which pods can schedule on these nodes
+  # Kubernetes taints
   dynamic "taint" {
     for_each = var.taints
     content {
@@ -402,21 +342,17 @@ resource "aws_eks_node_group" "this" {
     }
   }
 
-  tags = merge(
-    var.tags,
-    {
-      Name = "${var.cluster_name}-${var.node_group_name}"
-    }
-  )
+  tags = var.tags
 
+  # Ensure IAM role is ready before creating node group
   depends_on = [
     aws_iam_role_policy_attachment.node_AmazonEKSWorkerNodePolicy,
     aws_iam_role_policy_attachment.node_AmazonEKS_CNI_Policy,
     aws_iam_role_policy_attachment.node_AmazonEC2ContainerRegistryReadOnly,
   ]
 
+  # Ignore desired_size changes after creation to prevent drift
   lifecycle {
-    create_before_destroy = true
-    ignore_changes        = [scaling_config[0].desired_size]
+    ignore_changes = [scaling_config[0].desired_size]
   }
 }

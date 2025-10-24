@@ -257,7 +257,7 @@ run "explicit_policy" {
   variables {
     description = "Key with explicit policy"
     policy = jsonencode({
-      Version   = "2012-10-17"
+      Version = "2012-10-17"
       Statement = [
         {
           Sid       = "AllowBasic"

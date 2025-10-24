@@ -41,7 +41,7 @@ variables {
 
   # Minimal EC2 trust policy (string JSON)
   assume_role_policy = jsonencode({
-    Version   = "2012-10-17"
+    Version = "2012-10-17"
     Statement = [
       {
         Effect    = "Allow"
@@ -273,7 +273,7 @@ run "lambda_trust" {
   variables {
     name = "role-lambda"
     assume_role_policy = jsonencode({
-      Version   = "2012-10-17"
+      Version = "2012-10-17"
       Statement = [
         {
           Effect    = "Allow"

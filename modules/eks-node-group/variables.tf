@@ -1,8 +1,8 @@
 # -----------------------------------------------------------------------------
-# EKS NODE GROUP MODULE - INPUT VARIABLES
+# EKS NODE GROUP MODULE VARIABLES
 # -----------------------------------------------------------------------------
 #
-# This file defines all configurable parameters for the EKS Node Group module,
+# This file defines input variables for the EKS Node Group module,
 # including cluster integration, instance configuration, scaling parameters,
 # security settings, and Kubernetes-specific options.
 #
@@ -163,12 +163,6 @@ variable "additional_security_group_ids" {
   description = "Additional security group IDs to attach to nodes"
   type        = list(string)
   default     = []
-}
-
-variable "alb_security_group_id" {
-  description = "Security group ID of ALB (to allow traffic to pods)"
-  type        = string
-  default     = ""
 }
 
 # -----------------------------------------------------------------------------

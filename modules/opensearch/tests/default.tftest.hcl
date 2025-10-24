@@ -69,9 +69,9 @@ variables {
   automated_snapshot_start_hour = 3
 
   # Logging configuration
-  enable_audit_logs           = true
-  cloudwatch_retention_days   = 7
-  cloudwatch_kms_key_id       = null
+  enable_audit_logs         = true
+  cloudwatch_retention_days = 7
+  cloudwatch_kms_key_id     = null
 
   # Resource tagging
   tags = {
