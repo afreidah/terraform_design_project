@@ -1,3 +1,7 @@
+# -----------------------------------------------------------------------------
+# SSM PARAMETER STORE MODULE OUTPUTS
+# -----------------------------------------------------------------------------
+
 output "parameter_names" {
   description = "Map of parameter names"
   value       = { for k, v in aws_ssm_parameter.this : k => v.name }

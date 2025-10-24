@@ -1,25 +1,26 @@
-# ----------------------------------------------------------------
-# RDS Module Test Suite
+# -----------------------------------------------------------------------------
+# RDS MODULE TEST SUITE
+# -----------------------------------------------------------------------------
 #
-# Module under test:
-#   - aws_db_subnet_group.this
-#   - aws_db_instance.this
+# Plan-safe assertions validating subnet group configuration, instance
+# settings, storage encryption, backup configuration, and optional features.
+# Tests avoid equality checks against computed values like endpoints, ARNs,
+# and availability zones.
 #
-# Plan-safe assertions only (avoid computed fields like endpoint,
-# address, arn, id, resource_id, availability_zone).
-# Focus:
-#   - Subnet group name/tags and wiring to instance
-#   - Engine/class/storage/encryption/networking flags
-#   - Backups/maintenance windows and deletion/snapshot behavior
-#   - Perf Insights & Enhanced Monitoring conditionals
-#   - CloudWatch logs exports (set equality)
-#   - Tags (merged Name)
-#   - Outputs that are plan-known (port, db_subnet_group_name)
-# ----------------------------------------------------------------
+# Test Coverage:
+# Subnet group creation and naming. Instance engine, class, and storage
+# configuration. Encryption settings with optional KMS keys. Network
+# placement with security groups and public accessibility. Backup retention,
+# maintenance windows, and snapshot behavior. Multi-AZ deployment options.
+# Performance Insights and enhanced monitoring conditionals. CloudWatch log
+# exports. IAM database authentication. Tag propagation to all resources.
+# Output values known at plan time.
+# -----------------------------------------------------------------------------
 
-# ----------------------------------------------------------------
-# Shared defaults / mocks
-# ----------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# TEST DEFAULTS AND MOCK VALUES
+# -----------------------------------------------------------------------------
+
 variables {
   identifier     = "test-rds"
   engine         = "postgres"
@@ -74,17 +75,19 @@ variables {
   }
 }
 
-# ----------------------------------------------------------------
-# Baseline: subnet group wiring, engine/class, encryption, backups, tags
-# ----------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# BASELINE CONFIGURATION TEST
+# -----------------------------------------------------------------------------
+# Validates default configuration with standard features enabled
+
 run "baseline" {
   command = plan
 
   variables {
-    # use defaults above
+    # Use defaults above
   }
 
-  # Subnet group exists with expected name and subnets
+  # Subnet group configuration
   assert {
     condition     = aws_db_subnet_group.this.name == "${var.identifier}-subnet-group"
     error_message = "DB subnet group name should be <identifier>-subnet-group"
@@ -98,10 +101,10 @@ run "baseline" {
     error_message = "Subnet group Name tag should match"
   }
 
-  # Instance basics
+  # Instance basic configuration
   assert {
     condition     = aws_db_instance.this.identifier == var.identifier
-    error_message = "RDS identifier should match input"
+    error_message = "Instance identifier should match input"
   }
   assert {
     condition     = aws_db_instance.this.engine == var.engine && aws_db_instance.this.engine_version == var.engine_version
@@ -112,7 +115,7 @@ run "baseline" {
     error_message = "Instance class should match input"
   }
 
-  # Storage and encryption
+  # Storage configuration
   assert {
     condition     = aws_db_instance.this.allocated_storage == var.allocated_storage
     error_message = "Allocated storage should match input"
@@ -129,9 +132,8 @@ run "baseline" {
     condition     = aws_db_instance.this.storage_encrypted == var.storage_encrypted
     error_message = "Storage encryption flag should match input"
   }
-  # NOTE: Do not assert kms_key_id equality when var.kms_key_id is null; can be unknown at plan.
 
-  # Database / auth
+  # Database and authentication
   assert {
     condition     = aws_db_instance.this.db_name == var.db_name && aws_db_instance.this.username == var.username
     error_message = "DB name and username should match inputs"
@@ -145,7 +147,7 @@ run "baseline" {
     error_message = "IAM DB auth flag should match input"
   }
 
-  # Networking
+  # Network configuration
   assert {
     condition     = length(aws_db_instance.this.vpc_security_group_ids) == length(var.vpc_security_group_ids)
     error_message = "RDS should attach all provided security groups"
@@ -163,7 +165,7 @@ run "baseline" {
     error_message = "multi_az flag should match input"
   }
 
-  # Backups / maintenance
+  # Backup and maintenance
   assert {
     condition     = aws_db_instance.this.backup_retention_period == var.backup_retention_period
     error_message = "Backup retention should match input"
@@ -177,7 +179,7 @@ run "baseline" {
     error_message = "Maintenance window should match input"
   }
 
-  # Deletion protection and snapshot settings
+  # Deletion protection and snapshots
   assert {
     condition     = aws_db_instance.this.deletion_protection == true
     error_message = "Deletion protection should default to true"
@@ -191,7 +193,7 @@ run "baseline" {
     error_message = "final_snapshot_identifier should match when skip_final_snapshot=false"
   }
 
-  # Logs and upgrades (compare as sets to avoid list vs set mismatches)
+  # CloudWatch logs and version upgrades
   assert {
     condition     = length(setsubtract(toset(aws_db_instance.this.enabled_cloudwatch_logs_exports), toset(var.enabled_cloudwatch_logs_exports))) == 0 && length(setsubtract(toset(var.enabled_cloudwatch_logs_exports), toset(aws_db_instance.this.enabled_cloudwatch_logs_exports))) == 0
     error_message = "Enabled CloudWatch logs exports should match input"
@@ -201,7 +203,7 @@ run "baseline" {
     error_message = "Auto minor version upgrade flag should match input"
   }
 
-  # Performance Insights (enabled by default here)
+  # Performance Insights
   assert {
     condition     = aws_db_instance.this.performance_insights_enabled == true
     error_message = "Performance Insights should be enabled by default in baseline"
@@ -210,16 +212,14 @@ run "baseline" {
     condition     = aws_db_instance.this.performance_insights_retention_period == var.performance_insights_retention_period
     error_message = "PI retention period should match input"
   }
-  # NOTE: Do not assert performance_insights_kms_key_id equality when var is null; can be unknown at plan.
 
   # Enhanced monitoring disabled in baseline
   assert {
     condition     = aws_db_instance.this.monitoring_interval == 0
     error_message = "Monitoring interval should be 0 (disabled) in baseline"
   }
-  # NOTE: monitoring_role_arn may be unknown at plan even when interval=0; avoid asserting null here.
 
-  # Tags on instance
+  # Tag validation
   assert {
     condition     = aws_db_instance.this.tags["Name"] == var.identifier
     error_message = "Instance Name tag should equal identifier"
@@ -229,7 +229,7 @@ run "baseline" {
     error_message = "Instance should carry Env and Team tags"
   }
 
-  # Outputs (plan-known only)
+  # Plan-known outputs
   assert {
     condition     = output.port == var.port
     error_message = "Output port should match input"
@@ -240,9 +240,11 @@ run "baseline" {
   }
 }
 
-# ----------------------------------------------------------------
-# Snapshot behavior: skip_final_snapshot=true forces final id null
-# ----------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# SKIP FINAL SNAPSHOT TEST
+# -----------------------------------------------------------------------------
+# Validates snapshot behavior when skipping final snapshot
+
 run "skip_final_snapshot_true" {
   command = plan
 
@@ -261,17 +263,18 @@ run "skip_final_snapshot_true" {
   }
 }
 
-# ----------------------------------------------------------------
-# Performance Insights disabled: provider may still compute other attrs at plan.
-# Assert only the enabled flag to avoid plan-time unknowns.
-# ----------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# PERFORMANCE INSIGHTS DISABLED TEST
+# -----------------------------------------------------------------------------
+# Validates Performance Insights can be disabled
+
 run "performance_insights_disabled" {
   command = plan
 
   variables {
     performance_insights_enabled          = false
-    performance_insights_retention_period = 7   # ignored
-    performance_insights_kms_key_id       = "arn:aws:kms:us-east-1:123456789012:key/pi-abc" # ignored
+    performance_insights_retention_period = 7
+    performance_insights_kms_key_id       = "arn:aws:kms:us-east-1:123456789012:key/pi-abc"
   }
 
   assert {
@@ -280,9 +283,11 @@ run "performance_insights_disabled" {
   }
 }
 
-# ----------------------------------------------------------------
-# Performance Insights enabled with KMS: use valid retention (7 or 731/multiples of 31).
-# ----------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# PERFORMANCE INSIGHTS WITH KMS TEST
+# -----------------------------------------------------------------------------
+# Validates Performance Insights with custom KMS key
+
 run "performance_insights_with_kms" {
   command = plan
 
@@ -306,9 +311,11 @@ run "performance_insights_with_kms" {
   }
 }
 
-# ----------------------------------------------------------------
-# Enhanced Monitoring enabled requires role ARN
-# ----------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# ENHANCED MONITORING ENABLED TEST
+# -----------------------------------------------------------------------------
+# Validates enhanced monitoring with IAM role
+
 run "enhanced_monitoring_enabled" {
   command = plan
 
@@ -327,9 +334,11 @@ run "enhanced_monitoring_enabled" {
   }
 }
 
-# ----------------------------------------------------------------
-# Multi-AZ and encryption KMS key provided
-# ----------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# MULTI-AZ AND KMS ENCRYPTION TEST
+# -----------------------------------------------------------------------------
+# Validates high availability and custom KMS encryption
+
 run "ha_and_kms" {
   command = plan
 
@@ -352,9 +361,11 @@ run "ha_and_kms" {
   }
 }
 
-# ----------------------------------------------------------------
-# Public accessibility variant
-# ----------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# PUBLIC ACCESSIBILITY TEST
+# -----------------------------------------------------------------------------
+# Validates publicly accessible configuration
+
 run "publicly_accessible_variant" {
   command = plan
 
@@ -368,9 +379,11 @@ run "publicly_accessible_variant" {
   }
 }
 
-# ----------------------------------------------------------------
-# Parameter/Option groups passthrough
-# ----------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# PARAMETER AND OPTION GROUPS TEST
+# -----------------------------------------------------------------------------
+# Validates custom parameter and option group assignment
+
 run "param_and_option_groups" {
   command = plan
 

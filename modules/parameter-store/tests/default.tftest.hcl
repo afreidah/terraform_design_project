@@ -1,31 +1,36 @@
-# ----------------------------------------------------------------
-# SSM Parameter Store Module Test Suite
+# -----------------------------------------------------------------------------
+# SSM PARAMETER STORE MODULE TEST SUITE
+# -----------------------------------------------------------------------------
 #
-# Module under test:
-#   - aws_ssm_parameter.this (for_each over var.parameters)
+# Plan-safe assertions validating parameter creation, type configuration,
+# tier selection, KMS key assignment, and tag propagation. Tests avoid
+# equality checks against computed values like ARNs and versions.
 #
-# Plan-safe assertions only (avoid computed ARNs/versions).
-# Focus:
-#   - Resource count matches input map size
-#   - Per-parameter shape: name, type, tier, key_id (when provided)
-#   - Tags merged and Name tag equals parameter name
-#   - Outputs: parameter_names map shape and contents
-# ----------------------------------------------------------------
+# Test Coverage:
+# Parameter count matching input map size. Per-parameter validation of name,
+# type, tier, and KMS key assignment when provided. Tag merging with automatic
+# Name tag assignment. Output map structure and content verification. Default
+# value behavior for optional parameters. Mixed configurations with varying
+# encryption requirements.
+# -----------------------------------------------------------------------------
 
-# ----------------------------------------------------------------
-# Test Defaults / Mocks
-# ----------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# TEST DEFAULTS AND MOCK VALUES
+# -----------------------------------------------------------------------------
+
 variables {
-  # Baseline tags applied to all params (can be overridden per run)
+  # Baseline tags applied to all parameters
   tags = {
     Env  = "test"
     Team = "platform"
   }
 }
 
-# ----------------------------------------------------------------
-# Baseline: three parameters (SecureString with key_id, String, StringList Advanced)
-# ----------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# BASELINE CONFIGURATION TEST
+# -----------------------------------------------------------------------------
+# Validates three parameters with different types and tiers
+
 run "baseline_three_params" {
   command = plan
 
@@ -51,16 +56,15 @@ run "baseline_three_params" {
         tier        = "Advanced"
       }
     }
-    # tags inherited from defaults
   }
 
-  # Count matches
+  # Parameter count matches input map size
   assert {
     condition     = length(aws_ssm_parameter.this) == length(var.parameters)
     error_message = "Should create one SSM parameter per map entry"
   }
 
-  # Names equal keys
+  # Parameter names equal map keys
   assert {
     condition     = aws_ssm_parameter.this["/app/db/password"].name == "/app/db/password"
     error_message = "Parameter name must equal its map key (/app/db/password)"
@@ -74,7 +78,7 @@ run "baseline_three_params" {
     error_message = "Parameter name must equal its map key (/app/allowed_ips)"
   }
 
-  # Types
+  # Parameter types
   assert {
     condition     = aws_ssm_parameter.this["/app/db/password"].type == "SecureString"
     error_message = "DB password should be SecureString"
@@ -88,7 +92,7 @@ run "baseline_three_params" {
     error_message = "Allowed IPs should be StringList"
   }
 
-  # Tiers
+  # Parameter tiers
   assert {
     condition     = aws_ssm_parameter.this["/app/db/password"].tier == "Standard"
     error_message = "DB password tier should be Standard"
@@ -102,13 +106,13 @@ run "baseline_three_params" {
     error_message = "Allowed IPs tier should be Advanced"
   }
 
-  # key_id only for the SecureString with explicit KMS
+  # KMS key assignment for SecureString with explicit key
   assert {
     condition     = aws_ssm_parameter.this["/app/db/password"].key_id == "arn:aws:kms:us-east-1:123456789012:key/abcd1234-abcd-1234-abcd-1234abcd5678"
     error_message = "DB password key_id should match the provided KMS key ARN"
   }
 
-  # Tags present and Name tag equals key
+  # Tag validation
   assert {
     condition     = aws_ssm_parameter.this["/app/db/password"].tags["Name"] == "/app/db/password"
     error_message = "Name tag should equal the parameter name for /app/db/password"
@@ -118,7 +122,7 @@ run "baseline_three_params" {
     error_message = "Baseline tags should be merged on /app/api/url"
   }
 
-  # Outputs: parameter_names shape and sample entries
+  # Output structure validation
   assert {
     condition     = length(output.parameter_names) == length(var.parameters)
     error_message = "parameter_names output should include all parameters"
@@ -133,9 +137,11 @@ run "baseline_three_params" {
   }
 }
 
-# ----------------------------------------------------------------
-# Minimal input: rely on defaults (type SecureString, tier Standard), no tags
-# ----------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# MINIMAL INPUT WITH DEFAULTS TEST
+# -----------------------------------------------------------------------------
+# Validates default values for optional parameters
+
 run "minimal_input_defaults" {
   command = plan
 
@@ -145,10 +151,10 @@ run "minimal_input_defaults" {
         value = "whatever"
       }
     }
-    tags = {} # override to empty to ensure only Name is present
+    tags = {}
   }
 
-  # Type and tier default
+  # Default type and tier
   assert {
     condition     = aws_ssm_parameter.this["/app/min/defaults"].type == "SecureString"
     error_message = "Default type should be SecureString"
@@ -158,16 +164,18 @@ run "minimal_input_defaults" {
     error_message = "Default tier should be Standard"
   }
 
-  # Name tag still set via merge with Name
+  # Name tag automatically set
   assert {
     condition     = aws_ssm_parameter.this["/app/min/defaults"].tags["Name"] == "/app/min/defaults"
     error_message = "Name tag should be set to parameter name even when tags are empty"
   }
 }
 
-# ----------------------------------------------------------------
-# Tag merge: custom tags appear alongside Name
-# ----------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# TAG MERGE TEST
+# -----------------------------------------------------------------------------
+# Validates custom tags merged with automatic Name tag
+
 run "tag_merge" {
   command = plan
 
@@ -198,9 +206,11 @@ run "tag_merge" {
   }
 }
 
-# ----------------------------------------------------------------
-# Mixed: some with key_id, some without (ensure only equality where provided)
-# ----------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# MIXED KMS KEY CONFIGURATION TEST
+# -----------------------------------------------------------------------------
+# Validates parameters with and without explicit KMS keys
+
 run "mixed_key_ids" {
   command = plan
 
@@ -222,13 +232,13 @@ run "mixed_key_ids" {
     }
   }
 
-  # Provided key_id is respected
+  # Explicit KMS key assignment
   assert {
     condition     = aws_ssm_parameter.this["/secure/with-kms"].key_id == "alias/my-kms"
     error_message = "Explicit key_id should be set on /secure/with-kms"
   }
 
-  # Do not assert key_id for others (defaulting behavior differs by provider); instead, assert types
+  # Type validation for parameters without explicit KMS keys
   assert {
     condition     = aws_ssm_parameter.this["/secure/default-kms"].type == "SecureString"
     error_message = "/secure/default-kms must be SecureString"

@@ -1,4 +1,29 @@
-# Security Group
+# -----------------------------------------------------------------------------
+# SECURITY GROUP MODULE
+# -----------------------------------------------------------------------------
+#
+# This module creates an AWS VPC security group with configurable ingress and
+# egress rules for network traffic control. Rules are created as separate
+# resources to enable granular management and avoid the limitations of inline
+# rule definitions.
+#
+# The security group supports create-before-destroy lifecycle to ensure safe
+# updates during rule modifications. Rules can reference CIDR blocks or other
+# security groups as sources. Multiple protocols including TCP, UDP, and ICMP
+# are supported with configurable port ranges.
+#
+# IMPORTANT: Security scanner suppressions are included for common patterns
+# like public ALB ingress and EC2 egress to internet. Review and adjust
+# suppressions based on specific security requirements and organizational
+# policies.
+# -----------------------------------------------------------------------------
+
+# -----------------------------------------------------------------------------
+# SECURITY GROUP
+# -----------------------------------------------------------------------------
+
+# VPC security group for network access control
+# Uses create-before-destroy to prevent connectivity disruption during updates
 resource "aws_security_group" "this" {
   name        = var.name
   description = var.description
@@ -16,7 +41,12 @@ resource "aws_security_group" "this" {
   }
 }
 
-# Ingress Rules
+# -----------------------------------------------------------------------------
+# INGRESS RULES
+# -----------------------------------------------------------------------------
+
+# Inbound traffic rules for the security group
+# Created as separate resources for granular management
 resource "aws_security_group_rule" "ingress" {
   #tfsec:ignore:aws-ec2-no-public-ingress-sgr Public ALB requires internet access on 80/443
   #checkov:skip=CKV_AWS_260:Public ALB security group intentionally allows internet traffic
@@ -31,7 +61,12 @@ resource "aws_security_group_rule" "ingress" {
   description       = var.ingress_rules[count.index].description
 }
 
-# Egress Rules
+# -----------------------------------------------------------------------------
+# EGRESS RULES
+# -----------------------------------------------------------------------------
+
+# Outbound traffic rules for the security group
+# Created as separate resources for granular management
 resource "aws_security_group_rule" "egress" {
   #tfsec:ignore:aws-ec2-no-public-egress-sgr EC2 instances need internet access for package updates and AWS APIs
   #checkov:skip=CKV_AWS_23:Egress to internet required for package updates and AWS service access

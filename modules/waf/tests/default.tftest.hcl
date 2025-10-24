@@ -1,22 +1,24 @@
-# ----------------------------------------------------------------
-# WAF Module Test Suite (plan-safe)
+# -----------------------------------------------------------------------------
+# WAF MODULE TEST SUITE
+# -----------------------------------------------------------------------------
 #
-# Module under test:
-#   - aws_wafv2_web_acl.this
+# Plan-safe assertions validating WebACL configuration, rule presence, and
+# visibility settings. Tests avoid equality checks against computed values
+# like capacity, IDs, and ARNs that are unknown at plan time.
 #
-# Plan-safe assertions only (avoid computed capacity/ids/arns).
-# Focus:
-#   - Name, scope, default_action (allow/block)
-#   - Presence/absence of managed rules by name
-#   - Rate limit value when enabled
-#   - Geo blocking rule wiring
-#   - Visibility config flags and tags
-#   - Outputs that are plan-known (web_acl_name)
-# ----------------------------------------------------------------
+# Test Coverage:
+# WebACL creation with name and scope configuration. Default action behavior
+# for allow and block modes. AWS managed rule group presence including Core
+# Rule Set, Known Bad Inputs, and IP Reputation lists. Rate limiting rule
+# configuration with request threshold validation. Geographic blocking with
+# country code validation. CloudWatch metrics and sampled request settings.
+# Tag propagation. Output values known at plan time.
+# -----------------------------------------------------------------------------
 
-# ----------------------------------------------------------------
-# Shared defaults / mocks
-# ----------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# TEST DEFAULTS AND MOCK VALUES
+# -----------------------------------------------------------------------------
+
 variables {
   name  = "test-web-acl"
   scope = "REGIONAL"
@@ -41,17 +43,19 @@ variables {
   }
 }
 
-# ----------------------------------------------------------------
-# Baseline: defaults with managed rules, reputation, rate limiting
-# ----------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# BASELINE CONFIGURATION TEST
+# -----------------------------------------------------------------------------
+# Validates default configuration with all managed rules enabled
+
 run "baseline_defaults" {
   command = plan
 
   variables {
-    # use defaults above
+    # Use defaults above
   }
 
-  # Basic properties
+  # WebACL basic properties
   assert {
     condition     = aws_wafv2_web_acl.this.name == var.name
     error_message = "WebACL name should match input"
@@ -61,13 +65,13 @@ run "baseline_defaults" {
     error_message = "WebACL scope should match input"
   }
 
-  # Default action = allow
+  # Default action allow
   assert {
     condition     = try(length(aws_wafv2_web_acl.this.default_action[0].allow), 0) == 1
     error_message = "Default action should be allow"
   }
 
-  # Visibility config flags
+  # Visibility configuration
   assert {
     condition     = aws_wafv2_web_acl.this.visibility_config[0].cloudwatch_metrics_enabled == true
     error_message = "CloudWatch metrics should be enabled"
@@ -77,7 +81,7 @@ run "baseline_defaults" {
     error_message = "Sampled requests should be enabled"
   }
 
-  # Required managed rule groups present
+  # AWS managed rule groups presence
   assert {
     condition     = length([for r in aws_wafv2_web_acl.this.rule : r if r.name == "AWSManagedRulesCommonRuleSet"]) == 1
     error_message = "CommonRuleSet should be present"
@@ -91,7 +95,7 @@ run "baseline_defaults" {
     error_message = "AmazonIpReputationList should be present"
   }
 
-  # Rate limit rule present with correct limit
+  # Rate limiting rule validation
   assert {
     condition     = length([for r in aws_wafv2_web_acl.this.rule : r if r.name == "RateLimitRule"]) == 1
     error_message = "RateLimitRule should be present"
@@ -101,7 +105,7 @@ run "baseline_defaults" {
     error_message = "RateLimitRule limit should match input"
   }
 
-  # Tags
+  # Tag validation
   assert {
     condition     = aws_wafv2_web_acl.this.tags["Name"] == var.name
     error_message = "Name tag should equal WebACL name"
@@ -111,16 +115,18 @@ run "baseline_defaults" {
     error_message = "Env tag should be present"
   }
 
-  # Outputs (plan-known)
+  # Plan-known output
   assert {
     condition     = output.web_acl_name == var.name
     error_message = "Output web_acl_name should match input"
   }
 }
 
-# ----------------------------------------------------------------
-# Default action = block
-# ----------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# DEFAULT ACTION BLOCK TEST
+# -----------------------------------------------------------------------------
+# Validates block default action configuration
+
 run "default_action_block" {
   command = plan
 
@@ -138,9 +144,11 @@ run "default_action_block" {
   }
 }
 
-# ----------------------------------------------------------------
-# Disable AWS managed rules (Common/KnownBad), keep reputation on
-# ----------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# SELECTIVE MANAGED RULES TEST
+# -----------------------------------------------------------------------------
+# Validates disabling core managed rules while keeping IP reputation
+
 run "disable_managed_rules_keep_reputation" {
   command = plan
 
@@ -163,9 +171,11 @@ run "disable_managed_rules_keep_reputation" {
   }
 }
 
-# ----------------------------------------------------------------
-# Disable reputation and rate limiting
-# ----------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# DISABLE REPUTATION AND RATE LIMITING TEST
+# -----------------------------------------------------------------------------
+# Validates WebACL with minimal protection rules
+
 run "disable_reputation_and_rate" {
   command = plan
 
@@ -184,9 +194,11 @@ run "disable_reputation_and_rate" {
   }
 }
 
-# ----------------------------------------------------------------
-# Geo blocking enabled with two countries
-# ----------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# GEOGRAPHIC BLOCKING TEST
+# -----------------------------------------------------------------------------
+# Validates country-based traffic filtering
+
 run "geo_blocking_enabled" {
   command = plan
 
@@ -199,16 +211,17 @@ run "geo_blocking_enabled" {
     condition     = length([for r in aws_wafv2_web_acl.this.rule : r if r.name == "GeoBlockingRule"]) == 1
     error_message = "GeoBlockingRule should be present"
   }
-  # Check the list length (ordering is not guaranteed)
   assert {
     condition     = try(length([for r in aws_wafv2_web_acl.this.rule : r.statement[0].geo_match_statement[0].country_codes if r.name == "GeoBlockingRule"][0]), 0) == 2
     error_message = "GeoBlockingRule should include two country codes"
   }
 }
 
-# ----------------------------------------------------------------
-# CloudFront scope variant
-# ----------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# CLOUDFRONT SCOPE TEST
+# -----------------------------------------------------------------------------
+# Validates global CloudFront distribution protection
+
 run "cloudfront_scope" {
   command = plan
 
@@ -222,9 +235,11 @@ run "cloudfront_scope" {
   }
 }
 
-# ----------------------------------------------------------------
-# Metrics and sampling disabled variant
-# ----------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# METRICS AND SAMPLING DISABLED TEST
+# -----------------------------------------------------------------------------
+# Validates WebACL with minimal observability
+
 run "metrics_sampling_disabled" {
   command = plan
 

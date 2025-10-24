@@ -189,15 +189,15 @@ resource "aws_security_group_rule" "node_ingress_cluster_https" {
 
 # Allow ALB to reach pods directly (when using AWS Load Balancer Controller)
 resource "aws_security_group_rule" "node_ingress_alb" {
-  count = var.alb_security_group_id != "" ? 1 : 0
+  for_each = var.alb_security_group_id != "" ? toset(["alb"]) : toset([])
 
-  description              = "Allow ALB to reach pods"
   type                     = "ingress"
-  from_port                = 0
-  to_port                  = 65535
+  from_port                = 443
+  to_port                  = 443
   protocol                 = "tcp"
   security_group_id        = aws_security_group.node.id
   source_security_group_id = var.alb_security_group_id
+  description              = "Allow inbound traffic from ALB"
 }
 
 # -------------------------------------------------------------------------
