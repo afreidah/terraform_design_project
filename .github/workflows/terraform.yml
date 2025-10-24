@@ -101,17 +101,20 @@ jobs:
         run: |
           if [ -f environments/${{ matrix.environment }}/tfplan ]; then
             echo "✅ Plan file found, converting to text and JSON..."
+            
+            # Convert plan to text - do the redirection inside docker
             docker run --rm \
               -v ${{ github.workspace }}:/workspace \
               -w /workspace/environments/${{ matrix.environment }} \
               ${{ env.DOCKER_IMAGE }}:${{ github.sha }} \
-              terraform show -no-color tfplan > environments/${{ matrix.environment }}/tfplan.txt
+              sh -c "terraform show -no-color tfplan > tfplan.txt"
 
+            # Convert plan to JSON - do the redirection inside docker
             docker run --rm \
               -v ${{ github.workspace }}:/workspace \
               -w /workspace/environments/${{ matrix.environment }} \
               ${{ env.DOCKER_IMAGE }}:${{ github.sha }} \
-              terraform show -json tfplan > environments/${{ matrix.environment }}/tfplan.json
+              sh -c "terraform show -json tfplan > tfplan.json"
           else
             echo "❌ No plan file found"
             echo "No plan generated" > environments/${{ matrix.environment }}/tfplan.txt

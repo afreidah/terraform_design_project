@@ -120,7 +120,6 @@ test: ## Run terraform test on all modules
 plan: init ## Create execution plan
 	@echo "$(BLUE)Planning changes for $(ENV)...$(NC)"
 	@terraform -chdir=$(TERRAFORM_DIR) plan -out=tfplan
-	@terraform -chdir=$(TERRAFORM_DIR) show -json tfplan > $(TERRAFORM_DIR)/tfplan.json
 	@echo "$(GREEN)✓ Plan created$(NC)"
 
 plan-target: check-env ## Plan specific target (usage: make plan-target TARGET=module.vpc)
@@ -202,12 +201,13 @@ graph: check-env ## Generate dependency graph
 
 clean: check-env ## Clean temporary files for environment
 	@echo "$(BLUE)Cleaning $(ENV)...$(NC)"
-	cd $(TERRAFORM_DIR) && rm -f $(PLAN_FILE) tfplan.json *.tfstate.backup
+	cd $(TERRAFORM_DIR) && rm -f $(PLAN_FILE) tfplan.txt tfplan.json *.tfstate.backup
 	@echo "$(GREEN)✓ Cleanup complete$(NC)"
 
 clean-all: ## Clean all environments and modules
 	@echo "$(BLUE)Cleaning all environments and modules...$(NC)"
 	find environments -name "$(PLAN_FILE)" -delete
+	find environments -name "tfplan.txt" -delete
 	find environments -name "tfplan.json" -delete
 	find environments -name "*.tfstate.backup" -delete
 	find . -type d -name ".terraform" -exec rm -rf {} + 2>/dev/null || true
